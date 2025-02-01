@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AQUI Visual Test Environment</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            font-family: monospace;
+            background: #f0f0f0;
+        }
+        #editor-panel {
+            width: 40%;
+            padding: 20px;
+        }
+        #visualization-panel {
+            width: 60%;
+            padding: 20px;
+        }
+        #code-editor {
+            width: 100%;
+            height: 400px;
+            font-family: monospace;
+            font-size: 14px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            background: #fff;
+            resize: vertical;
+        }
+        #run-button {
+            padding: 10px 20px;
+            font-size: 14px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        #error-display {
+            color: red;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        #canvas {
+            border: 1px solid #ccc;
+            background: white;
+        }
+        #output-display {
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            height: 200px;
+            overflow: auto;
+            padding: 10px;
+            background: white;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="editor-panel">
+        <textarea id="code-editor">// Example AQUI code
+param width 200
+param height 150
+param radius width * 0.2
+
+shape rectangle main {
+    width: param.width
+    height: param.height
+    position: [0 0]
+}
+
+shape circle center {
+    radius: param.radius
+    position: [0 0]
+}
+
+layer base {
+    add main
+    add center
+    rotate 45
+}
+</textarea>
+        <button id="run-button">Run</button>
+        <div id="error-display"></div>
+        <div id="output-display"></div>
+    </div>
+    <div id="visualization-panel">
+        <canvas id="canvas" width="800" height="600"></canvas>
+    </div>
+
+    <script type="module">
+        import { Lexer, Parser } from './lexer_and_parser.mjs';
+        import { Interpreter } from './interpreter.mjs';
+
+        class Renderer {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.scale = 1;
+                this.offsetX = canvas.width / 2;
+                this.offsetY = canvas.height / 2;
+            }
+
+            clear() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.drawGrid();
+                this.drawAxes();
+            }
+
+            drawGrid() {
+                this.ctx.strokeStyle = '#e0e0e0';
+                this.ctx.lineWidth = 1;
+
+                // Draw vertical lines
+                for (let x = -400; x <= 400; x += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.transformX(x), this.transformY(-300));
+                    this.ctx.lineTo(this.transformX(x), this.transformY(300));
+                    this.ctx.stroke();
+                }
+
+                // Draw horizontal lines
+                for (let y = -300; y <= 300; y += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.transformX(-400), this.transformY(y));
+                    this.ctx.lineTo(this.transformX(400), this.transformY(y));
+                    this.ctx.stroke();
+                }
+            }
+
+            drawAxes() {
+                this.ctx.strokeStyle = '#000';
+                this.ctx.lineWidth = 2;
+
+                // X-axis
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.transformX(-400), this.transformY(0));
+                this.ctx.lineTo(this.transformX(400), this.transformY(0));
+                this.ctx.stroke();
+
+                // Y-axis
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.transformX(0), this.transformY(-300));
+                this.ctx.lineTo(this.transformX(0), this.transformY(300));
+                this.ctx.stroke();
+            }
+
+            transformX(x) {
+                return x * this.scale + this.offsetX;
+            }
+
+            transformY(y) {
+                return -y * this.scale + this.offsetY;
+            }
+
+            drawShape(shape) {
+                const { type, params, transform } = shape;
+                this.ctx.save();
+                
+                // Apply transforms
+                this.ctx.translate(
+                    this.transformX(transform.position[0]), 
+                    this.transformY(transform.position[1])
+                );
+                this.ctx.rotate(transform.rotation * Math.PI / 180);
+                this.ctx.scale(transform.scale[0], transform.scale[1]);
+
+                this.ctx.strokeStyle = '#000';
+                this.ctx.lineWidth = 2;
+
+                switch (type) {
+                    case 'rectangle':
+                        this.drawRectangle(params);
+                        break;
+                    case 'circle':
+                        this.drawCircle(params);
+                        break;
+                    default:
+                        console.warn(`Unknown shape type: ${type}`);
+                }
+
+                this.ctx.restore();
+            }
+
+            drawRectangle(params) {
+                const { width, height } = params;
+                this.ctx.strokeRect(
+                    -width/2, -height/2,
+                    width, height
+                );
+            }
+
+            drawCircle(params) {
+                const { radius } = params;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
+                this.ctx.stroke();
+            }
+        }
+
+        // Setup test environment
+        const canvas = document.getElementById('canvas');
+        const renderer = new Renderer(canvas);
+        const editor = document.getElementById('code-editor');
+        const runButton = document.getElementById('run-button');
+        const errorDisplay = document.getElementById('error-display');
+        const outputDisplay = document.getElementById('output-display');
+
+        runButton.addEventListener('click', () => {
+            try {
+                // Clear previous output
+                errorDisplay.textContent = '';
+                outputDisplay.textContent = '';
+                renderer.clear();
+
+                const code = editor.value;
+                
+                // Parse and interpret code
+                const lexer = new Lexer(code);
+                const parser = new Parser(lexer);
+                const ast = parser.parse();
+                
+                outputDisplay.textContent = 'AST:\n' + JSON.stringify(ast, null, 2);
+
+                const interpreter = new Interpreter();
+                const result = interpreter.interpret(ast);
+
+                // Draw shapes
+                for (const shape of result.shapes.values()) {
+                    renderer.drawShape(shape);
+                }
+
+                // Draw layers
+                for (const layer of result.layers.values()) {
+                    for (const shape of layer.shapes.values()) {
+                        const transformedShape = {
+                            ...shape,
+                            transform: {
+                                ...shape.transform,
+                                rotation: (shape.transform.rotation || 0) + (layer.transform.rotation || 0),
+                                scale: [
+                                    (shape.transform.scale[0] || 1) * (layer.transform.scale[0] || 1),
+                                    (shape.transform.scale[1] || 1) * (layer.transform.scale[1] || 1)
+                                ]
+                            }
+                        };
+                        renderer.drawShape(transformedShape);
+                    }
+                }
+
+            } catch (error) {
+                errorDisplay.textContent = `Error: ${error.message}\n${error.stack}`;
+                console.error(error);
+            }
+        });
+
+        // Initial render
+        runButton.click();
+    </script>
+</body>
+</html>
