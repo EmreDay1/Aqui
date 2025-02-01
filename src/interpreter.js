@@ -1,22 +1,85 @@
-// src/runtime/interpreter.js
-import * as Shapes from './Shapes.mjs';
-import  { Lexer, Parser } from './lexer_and_parser.mjs';
+// interpreter.mjs
+class Environment {
+    constructor() {
+        this.parameters = new Map();
+        this.shapes = new Map();
+        this.layers = new Map();
+        this.transformStack = [];
+    }
+
+    getParameter(name) {
+        const value = this.parameters.get(name);
+        if (value === undefined) {
+            throw new Error(`Parameter not found: ${name}`);
+        }
+        return value;
+    }
+
+    setParameter(name, value) {
+        this.parameters.set(name, value);
+        // Update dependent parameters
+        this.updateDependents(name);
+    }
+
+    updateDependents(paramName) {
+        // Future: Add parameter dependency tracking
+    }
+
+    createShape(type, name, params) {
+        const shape = {
+            type,
+            id: `${type}_${name}_${Date.now()}`,
+            params: { ...params },
+            transform: {
+                position: params.position || [0, 0],
+                rotation: 0,
+                scale: [1, 1]
+            }
+        };
+        this.shapes.set(name, shape);
+        return shape;
+    }
+
+    getShape(name) {
+        const shape = this.shapes.get(name);
+        if (!shape) {
+            throw new Error(`Shape not found: ${name}`);
+        }
+        return shape;
+    }
+
+    createLayer(name) {
+        const layer = {
+            name,
+            shapes: new Map(),
+            operations: [],
+            transform: {
+                position: [0, 0],
+                rotation: 0,
+                scale: [1, 1]
+            }
+        };
+        this.layers.set(name, layer);
+        return layer;
+    }
+}
 
 class Interpreter {
     constructor() {
-        this.env = {
-            parameters: new Map(),
-            shapes: new Map(),
-            currentLayer: null,
-            layers: new Map()
-        };
+        this.env = new Environment();
     }
 
     interpret(ast) {
+        let result = null;
         for (const node of ast) {
-            this.evaluateNode(node);
+            result = this.evaluateNode(node);
         }
-        return this.env;
+        return {
+            parameters: this.env.parameters,
+            shapes: this.env.shapes,
+            layers: this.env.layers,
+            result
+        };
     }
 
     evaluateNode(node) {
@@ -38,163 +101,161 @@ class Interpreter {
 
     evaluateParam(node) {
         const value = this.evaluateExpression(node.value);
-        this.env.parameters.set(node.name, value);
+        this.env.setParameter(node.name, value);
         return value;
     }
 
     evaluateShape(node) {
-        // Get shape constructor
-        const ShapeClass = Shapes[node.shapeType];
-        if (!ShapeClass) {
-            throw new Error(`Unknown shape type: ${node.shapeType}`);
-        }
-
-        // Evaluate parameters
         const params = {};
-        for (const [key, value] of Object.entries(node.params)) {
-            params[key] = this.evaluateExpression(value);
+        // Evaluate each parameter
+        for (const [key, expr] of Object.entries(node.params)) {
+            params[key] = this.evaluateExpression(expr);
         }
 
-        // Create shape
-        const shape = new ShapeClass(...Object.values(params));
-
-        // Store shape if it has a name
-        if (node.name) {
-            if (this.env.currentLayer) {
-                this.env.layers.get(this.env.currentLayer).shapes.set(node.name, shape);
-            } else {
-                this.env.shapes.set(node.name, shape);
-            }
-        }
-
-        return shape;
-    }
-
-    evaluateLayer(node) {
-        this.env.layers.set(node.name, {
-            shapes: new Map(),
-            transforms: []
-        });
-        this.env.currentLayer = node.name;
-
-        // Evaluate all statements in layer
-        node.statements.forEach(stmt => this.evaluateNode(stmt));
-
-        this.env.currentLayer = null;
-        return this.env.layers.get(node.name);
-    }
-
-    evaluateTransform(node) {
-        const shape = this.getShape(node.target);
-        const args = node.args.map(arg => this.evaluateExpression(arg));
-
-        switch (node.operation) {
-            case 'translate':
-                shape.translate(args[0], args[1]);
-                break;
-            case 'rotate':
-                shape.rotate(args[0]);
-                break;
-            case 'scale':
-                shape.setScale(args[0], args[1] ?? args[0]);
-                break;
-            default:
-                throw new Error(`Unknown transform: ${node.operation}`);
-        }
-
-        return shape;
-    }
-
-    evaluateOperation(node) {
-        const shape1 = this.getShape(node.shape1);
-        const shape2 = this.getShape(node.shape2);
-
-        switch (node.operator) {
-            case 'union':
-                return Shapes.ShapeUtils.union(shape1, shape2);
-            case 'subtract':
-                return Shapes.ShapeUtils.subtract(shape1, shape2);
-            case 'intersect':
-                return Shapes.ShapeUtils.intersect(shape1, shape2);
-            default:
-                throw new Error(`Unknown operation: ${node.operator}`);
-        }
+        return this.env.createShape(node.shapeType, node.name, params);
     }
 
     evaluateExpression(expr) {
-        if (typeof expr === 'number') return expr;
-        if (typeof expr === 'string') {
-            // Check if it's a parameter reference
-            if (expr.startsWith('param.')) {
-                const paramName = expr.slice(6);
-                const value = this.env.parameters.get(paramName);
-                if (value === undefined) {
-                    throw new Error(`Undefined parameter: ${paramName}`);
+        if (!expr || typeof expr !== 'object') {
+            throw new Error(`Invalid expression: ${JSON.stringify(expr)}`);
+        }
+
+        switch (expr.type) {
+            case 'number':
+                return expr.value;
+
+            case 'identifier':
+                if (expr.name.startsWith('param.')) {
+                    const paramName = expr.name.split('.')[1];
+                    return this.env.getParameter(paramName);
                 }
-                return value;
-            }
-            // Check if it's a shape reference
-            const value = this.env.parameters.get(expr) ?? this.getShape(expr);
-            if (value === undefined) {
-                throw new Error(`Undefined reference: ${expr}`);
-            }
-            return value;
+                return this.env.getParameter(expr.name);
+
+            case 'binary_op':
+                const left = this.evaluateExpression(expr.left);
+                const right = this.evaluateExpression(expr.right);
+                return this.evaluateBinaryOp(expr.operator, left, right);
+
+            case 'unary_op':
+                const operand = this.evaluateExpression(expr.operand);
+                return this.evaluateUnaryOp(expr.operator, operand);
+
+            case 'array':
+                return expr.elements.map(element => this.evaluateExpression(element));
+
+            default:
+                throw new Error(`Unknown expression type: ${expr.type}`);
         }
-        if (expr.type === 'binary') {
-            const left = this.evaluateExpression(expr.left);
-            const right = this.evaluateExpression(expr.right);
-            switch (expr.operator) {
-                case '+': return left + right;
-                case '-': return left - right;
-                case '*': return left * right;
-                case '/': return left / right;
+    }
+
+    evaluateBinaryOp(operator, left, right) {
+        switch (operator) {
+            case 'plus':
+            case '+':
+                return left + right;
+            case 'minus':
+            case '-':
+                return left - right;
+            case 'multiply':
+            case '*':
+                return left * right;
+            case 'divide':
+            case '/':
+                if (right === 0) throw new Error('Division by zero');
+                return left / right;
+            default:
+                throw new Error(`Unknown binary operator: ${operator}`);
+        }
+    }
+
+    evaluateUnaryOp(operator, operand) {
+        switch (operator) {
+            case 'minus':
+            case '-':
+                return -operand;
+            case 'plus':
+            case '+':
+                return +operand;
+            default:
+                throw new Error(`Unknown unary operator: ${operator}`);
+        }
+    }
+
+    evaluateLayer(node) {
+        const layer = this.env.createLayer(node.name);
+
+        for (const cmd of node.commands) {
+            switch (cmd.type) {
+                case 'add':
+                    const shape = this.env.getShape(cmd.shape);
+                    layer.shapes.set(cmd.shape, shape);
+                    break;
+                case 'subtract':
+                    layer.operations.push({
+                        type: 'subtract',
+                        shape: this.env.getShape(cmd.shape)
+                    });
+                    break;
+                case 'rotate':
+                    layer.operations.push({
+                        type: 'rotate',
+                        angle: this.evaluateExpression(cmd.angle)
+                    });
+                    break;
                 default:
-                    throw new Error(`Unknown operator: ${expr.operator}`);
+                    throw new Error(`Unknown layer command: ${cmd.type}`);
             }
         }
-        throw new Error(`Invalid expression: ${JSON.stringify(expr)}`);
+
+        return layer;
     }
 
-    getShape(name) {
-        if (this.env.currentLayer) {
-            const shape = this.env.layers.get(this.env.currentLayer).shapes.get(name);
-            if (shape) return shape;
+    evaluateTransform(node) {
+        const target = this.env.layers.get(node.target) || this.env.shapes.get(node.target);
+        if (!target) {
+            throw new Error(`Transform target not found: ${node.target}`);
         }
-        const shape = this.env.shapes.get(name);
-        if (!shape) {
-            throw new Error(`Shape not found: ${name}`);
+
+        for (const op of node.operations) {
+            switch (op.type) {
+                case 'scale':
+                    const scaleValue = this.evaluateExpression(op.value);
+                    target.transform.scale = [scaleValue, scaleValue];
+                    break;
+                case 'rotate':
+                    target.transform.rotation = this.evaluateExpression(op.angle);
+                    break;
+                case 'translate':
+                    const [x, y] = this.evaluateExpression(op.value);
+                    target.transform.position = [x, y];
+                    break;
+                default:
+                    throw new Error(`Unknown transform operation: ${op.type}`);
+            }
         }
-        return shape;
+
+        return target;
+    }
+
+    evaluateOperation(node) {
+        switch (node.type) {
+            case 'boolean':
+                return this.evaluateBooleanOperation(node);
+            default:
+                throw new Error(`Unknown operation type: ${node.type}`);
+        }
+    }
+
+    evaluateBooleanOperation(node) {
+        const shape1 = this.env.getShape(node.shape1);
+        const shape2 = this.env.getShape(node.shape2);
+        
+        return {
+            type: 'boolean_result',
+            operation: node.operator,
+            shapes: [shape1, shape2]
+        };
     }
 }
 
-// Usage example
-function executeCode(code) {
-    const lexer = new Lexer(code);
-    const parser = new Parser(lexer);
-    const ast = parser.parse();
-    const interpreter = new Interpreter();
-    return interpreter.interpret(ast);
-}
-
-// Example code:
-const exampleCode = `
-    param width 100
-    param height width * 0.6
-
-    rect box {
-        width: param.width
-        height: param.height
-    }
-
-    circle hole {
-        radius: 10
-    }
-
-    layer combined {
-        move hole [0 0]
-        subtract box hole
-    }
-`;
-
-export { Interpreter, executeCode };
+export { Interpreter, Environment };
