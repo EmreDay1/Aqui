@@ -153,6 +153,9 @@ class Lexer {
                 case '.':
                     this.advance();
                     return new Token('DOT', '.', this.line, this.column);
+                case '"':
+                    this.advance();
+                    return new Token('QUOTE', '"', this.line, this.column);
             }
 
             this.error(`Unexpected character: ${this.currentChar}`);
@@ -272,6 +275,30 @@ class Parser {
             };
         } else if (this.currentToken.type === 'LBRACKET') {
             return this.parseArray();
+        } else if (this.currentToken.type === 'QUOTE') {
+            this.eat('QUOTE');
+            let result = '';
+            
+            // Collect all characters until closing quote
+            while (this.currentToken.type !== 'QUOTE' && this.currentToken.type !== 'EOF') {
+                // Add the current token's value to our string
+                result += this.currentToken.value;
+                // Move to next token
+                this.currentToken = this.lexer.getNextToken();
+                
+                // Add space if not at the end
+                if (this.currentToken.type !== 'QUOTE') {
+                    result += ' ';
+                }
+            }
+            
+            // Eat the closing quote
+            this.eat('QUOTE');
+            
+            return {
+                type: 'string',
+                value: result.trim()
+            };
         }
         
         this.error(`Unexpected token in factor: ${this.currentToken.type}`);
