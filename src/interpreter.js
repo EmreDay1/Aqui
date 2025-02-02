@@ -124,6 +124,9 @@ class Interpreter {
             case 'number':
                 return expr.value;
 
+            case 'string':
+                return expr.value;  // Add this case to handle strings
+
             case 'identifier':
                 if (expr.name.startsWith('param.')) {
                     const paramName = expr.name.split('.')[1];
