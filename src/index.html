@@ -76,221 +76,234 @@
         import { Interpreter } from './interpreter.mjs';
 
         class Renderer {
-            constructor(canvas) {
-                this.canvas = canvas;
-                this.ctx = canvas.getContext('2d');
-                this.scale = 1;
-                this.offsetX = canvas.width / 2;
-                this.offsetY = canvas.height / 2;
-            }
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.scale = 1;
+        this.offsetX = canvas.width / 2;
+        this.offsetY = canvas.height / 2;
+    }
 
-            clear() {
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-                this.drawGrid();
-                this.drawAxes();
-            }
+    clear() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.drawGrid();
+        this.drawAxes();
+    }
 
-            drawGrid() {
-                this.ctx.strokeStyle = '#e0e0e0';
-                this.ctx.lineWidth = 1;
+    drawGrid() {
+        this.ctx.strokeStyle = '#e0e0e0';
+        this.ctx.lineWidth = 1;
 
-                for (let x = -400; x <= 400; x += 50) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(this.transformX(x), this.transformY(-300));
-                    this.ctx.lineTo(this.transformX(x), this.transformY(300));
-                    this.ctx.stroke();
-                }
+        // Vertical lines
+        for (let x = -400; x <= 400; x += 50) {
+            const [screenX] = this.worldToScreen(x, 0);
+            this.ctx.beginPath();
+            this.ctx.moveTo(screenX, 0);
+            this.ctx.lineTo(screenX, this.canvas.height);
+            this.ctx.stroke();
+        }
 
-                for (let y = -300; y <= 300; y += 50) {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(this.transformX(-400), this.transformY(y));
-                    this.ctx.lineTo(this.transformX(400), this.transformY(y));
-                    this.ctx.stroke();
-                }
-            }
+        // Horizontal lines
+        for (let y = -300; y <= 300; y += 50) {
+            const [, screenY] = this.worldToScreen(0, y);
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, screenY);
+            this.ctx.lineTo(this.canvas.width, screenY);
+            this.ctx.stroke();
+        }
+    }
 
-            drawAxes() {
-                this.ctx.strokeStyle = '#000';
-                this.ctx.lineWidth = 2;
+    drawAxes() {
+        this.ctx.strokeStyle = '#000';
+        this.ctx.lineWidth = 2;
 
-                this.ctx.beginPath();
-                this.ctx.moveTo(this.transformX(-400), this.transformY(0));
-                this.ctx.lineTo(this.transformX(400), this.transformY(0));
-                this.ctx.stroke();
+        // X axis
+        const [, yAxisY] = this.worldToScreen(0, 0);
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, yAxisY);
+        this.ctx.lineTo(this.canvas.width, yAxisY);
+        this.ctx.stroke();
 
-                this.ctx.beginPath();
-                this.ctx.moveTo(this.transformX(0), this.transformY(-300));
-                this.ctx.lineTo(this.transformX(0), this.transformY(300));
-                this.ctx.stroke();
-            }
+        // Y axis
+        const [xAxisX] = this.worldToScreen(0, 0);
+        this.ctx.beginPath();
+        this.ctx.moveTo(xAxisX, 0);
+        this.ctx.lineTo(xAxisX, this.canvas.height);
+        this.ctx.stroke();
+    }
 
-            transformX(x) {
-                return x * this.scale + this.offsetX;
-            }
+    worldToScreen(worldX, worldY) {
+        return [
+            worldX * this.scale + this.offsetX,
+            this.offsetY - worldY * this.scale
+        ];
+    }
 
-            transformY(y) {
-                return -y * this.scale + this.offsetY;
-            }
+    drawShape(shape) {
+        const { type, params, transform } = shape;
+        
+        this.ctx.save();
+        
+        // Convert world coordinates to screen coordinates
+        const [screenX, screenY] = this.worldToScreen(
+            transform.position[0],
+            transform.position[1]
+        );
 
-            drawShape(shape) {
-                const { type, params, transform } = shape;
-                this.ctx.save();
-                
-                this.ctx.translate(
-                    this.transformX(transform.position[0]), 
-                    this.transformY(transform.position[1])
-                );
-                this.ctx.rotate(-transform.rotation * Math.PI / 180);
-                this.ctx.scale(transform.scale[0], transform.scale[1]);
+        // Apply transformations
+        this.ctx.translate(screenX, screenY);
+        this.ctx.rotate(-transform.rotation * Math.PI / 180);
+        this.ctx.scale(transform.scale[0], transform.scale[1]);
 
-                this.ctx.strokeStyle = '#000';
-                this.ctx.lineWidth = 2;
-                this.ctx.fillStyle = 'rgba(0,0,0,0.1)';
+        // Set default styling
+        this.ctx.strokeStyle = '#000';
+        this.ctx.lineWidth = 2;
+        this.ctx.fillStyle = 'rgba(0,0,0,0.1)';
 
-                switch (type) {
-                    case 'rectangle':
-                        this.drawRectangle(params);
-                        break;
-                    case 'circle':
-                        this.drawCircle(params);
-                        break;
-                    case 'triangle':
-                        this.drawTriangle(params);
-                        break;
-                    case 'ellipse':
-                        this.drawEllipse(params);
-                        break;
-                    case 'path':
-                        this.drawPath(params);
-                        break;
-                    case 'text':
-                        this.drawText(params);
-                        break;
-                    case 'bezier':
-                        this.drawBezierCurve(params);
-                        break;
-                    case 'cross':
-                        this.drawCross(params);
-                        break;
-                    case 'gear':
-                        this.drawGear(params);
-                        break;
-                    case 'slot':
-                        this.drawSlot(params);
-                        break;
-                }
+        // Draw appropriate shape
+        switch (type) {
+            case 'rectangle':
+                this.drawRectangle(params);
+                break;
+            case 'circle':
+                this.drawCircle(params);
+                break;
+            case 'triangle':
+                this.drawTriangle(params);
+                break;
+            case 'ellipse':
+                this.drawEllipse(params);
+                break;
+            case 'path':
+                this.drawPath(params);
+                break;
+            case 'text':
+                this.drawText(params);
+                break;
+            case 'bezier':
+                this.drawBezierCurve(params);
+                break;
+            case 'cross':
+                this.drawCross(params);
+                break;
+            case 'gear':
+                this.drawGear(params);
+                break;
+            case 'slot':
+                this.drawSlot(params);
+                break;
+        }
 
-                this.ctx.restore();
-            }
+        this.ctx.restore();
+    }
 
-            // Original working shape functions
-            drawRectangle(params) {
-                const { width, height } = params;
-                this.ctx.beginPath();
-                this.ctx.rect(-width/2, -height/2, width, height);
-                this.ctx.stroke();
-                this.ctx.fill();
-            }
+    drawRectangle(params) {
+        const { width, height } = params;
+        this.ctx.beginPath();
+        this.ctx.rect(-width/2, -height/2, width, height);
+        this.ctx.stroke();
+        this.ctx.fill();
+    }
 
-            drawCircle(params) {
-                const { radius } = params;
-                this.ctx.beginPath();
-                this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
-                this.ctx.stroke();
-                this.ctx.fill();
-            }
+    drawCircle(params) {
+        const { radius } = params;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.fill();
+    }
 
-            drawEllipse(params) {
-                const { radiusX, radiusY } = params;
-                this.ctx.beginPath();
-                this.ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
-                this.ctx.stroke();
-                this.ctx.fill();
-            }
+    drawEllipse(params) {
+        const { radiusX, radiusY } = params;
+        this.ctx.beginPath();
+        this.ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.fill();
+    }
 
-            // Fixed shape functions
-            drawTriangle(params) {
-                const { base, height } = params;
-                this.ctx.beginPath();
-                this.ctx.moveTo(-base/2, -height/2);
-                this.ctx.lineTo(base/2, -height/2);
-                this.ctx.lineTo(0, height/2);
-                this.ctx.closePath();
-                this.ctx.stroke();
-                this.ctx.fill();
-            }
+    drawTriangle(params) {
+        const { base, height } = params;
+        this.ctx.beginPath();
+        this.ctx.moveTo(-base/2, -height/2);
+        this.ctx.lineTo(base/2, -height/2);
+        this.ctx.lineTo(0, height/2);
+        this.ctx.closePath();
+        this.ctx.stroke();
+        this.ctx.fill();
+    }
 
-            drawPath(params) {
-                const points = params.points;
-                if (!points || points.length < 2) return;
+    drawPath(params) {
+        const { points } = params;
+        if (!points || points.length < 2) return;
 
-                this.ctx.beginPath();
-                this.ctx.moveTo(points[0][0], points[0][1]);
-                for (let i = 1; i < points.length; i++) {
-                    this.ctx.lineTo(points[i][0], points[i][1]);
-                }
-                this.ctx.stroke();
-                this.ctx.fill();
-            }
+        this.ctx.beginPath();
+        this.ctx.moveTo(points[0][0], points[0][1]);
+        for (let i = 1; i < points.length; i++) {
+            this.ctx.lineTo(points[i][0], points[i][1]);
+        }
+        if (points.length > 2) {
+            this.ctx.closePath();
+        }
+        this.ctx.stroke();
+        this.ctx.fill();
+    }
 
-            drawText(params) {
-                const { text, fontSize = 24, fontFamily = 'Arial' } = params;
-                
-                // Set up text properties
-                this.ctx.font = `${fontSize}px ${fontFamily}`;
-                this.ctx.textAlign = 'center';
-                this.ctx.textBaseline = 'middle';
-                this.ctx.lineWidth = 2;
-                
-                // Draw outlined text (stroke only, no fill)
-                this.ctx.strokeStyle = '#000';
-                this.ctx.fillStyle = 'transparent';
-                
-                // First stroke the text
-                this.ctx.strokeText(text, 0, 0);
-                
-                // Optional: make the inside slightly lighter
-                this.ctx.lineWidth = 1;
-                this.ctx.strokeStyle = '#ddd';
-                this.ctx.strokeText(text, 0, 0);
-            }
-            drawBezierCurve(params) {
-                const { start, control1, control2, end } = params;
-                this.ctx.beginPath();
-                this.ctx.moveTo(start[0], start[1]);
-                this.ctx.bezierCurveTo(
-                    control1[0], control1[1],
-                    control2[0], control2[1],
-                    end[0], end[1]
-                );
-                this.ctx.stroke();
-            }
+    drawText(params) {
+        const { text, fontSize = 24, fontFamily = 'Arial' } = params;
+        // Flip text right-side up since we're in a transformed context
+        this.ctx.scale(1, -1);
+        this.ctx.font = `${fontSize}px ${fontFamily}`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        
+        // Draw outlined text
+        this.ctx.strokeStyle = '#000';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeText(text, 0, 0);
+        
+        // Inner detail
+        this.ctx.strokeStyle = '#ddd';
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeText(text, 0, 0);
+    }
 
-            drawCross(params) {
-                const { width, thickness } = params;
-                const w = width/2;
-                const t = thickness/2;
-                
-                this.ctx.beginPath();
-                this.ctx.moveTo(-t, -w);
-                this.ctx.lineTo(t, -w);
-                this.ctx.lineTo(t, -t);
-                this.ctx.lineTo(w, -t);
-                this.ctx.lineTo(w, t);
-                this.ctx.lineTo(t, t);
-                this.ctx.lineTo(t, w);
-                this.ctx.lineTo(-t, w);
-                this.ctx.lineTo(-t, t);
-                this.ctx.lineTo(-w, t);
-                this.ctx.lineTo(-w, -t);
-                this.ctx.lineTo(-t, -t);
-                this.ctx.closePath();
-                this.ctx.stroke();
-                this.ctx.fill();
-            }
+    drawBezierCurve(params) {
+        const { start, control1, control2, end } = params;
+        this.ctx.beginPath();
+        this.ctx.moveTo(start[0], start[1]);
+        this.ctx.bezierCurveTo(
+            control1[0], control1[1],
+            control2[0], control2[1],
+            end[0], end[1]
+        );
+        this.ctx.stroke();
+    }
 
-            drawGear(params) {
-    const { diameter, teeth } = params;
+    drawCross(params) {
+        const { width, thickness } = params;
+        const w = width/2;
+        const t = thickness/2;
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(-t, -w);
+        this.ctx.lineTo(t, -w);
+        this.ctx.lineTo(t, -t);
+        this.ctx.lineTo(w, -t);
+        this.ctx.lineTo(w, t);
+        this.ctx.lineTo(t, t);
+        this.ctx.lineTo(t, w);
+        this.ctx.lineTo(-t, w);
+        this.ctx.lineTo(-t, t);
+        this.ctx.lineTo(-w, t);
+        this.ctx.lineTo(-w, -t);
+        this.ctx.lineTo(-t, -t);
+        this.ctx.closePath();
+        this.ctx.stroke();
+        this.ctx.fill();
+    }
+
+    drawGear(params) {
+        const { diameter, teeth } = params;
     const radius = diameter / 2;
     const toothDepth = radius * 0.25;        // Deeper teeth for industrial look
     const toothWidth = (Math.PI * radius * 0.3) / teeth;  // Wider teeth
@@ -342,25 +355,27 @@
     this.ctx.beginPath();
     this.ctx.arc(0, 0, innerRadius * 0.6, 0, Math.PI * 2);
     this.ctx.stroke();
+    }
+
+
+
+    
+
+    drawSlot(params) {
+        const { length, width } = params;
+        const radius = width / 2;
+        const centerDist = (length - width) / 2;
+        
+        this.ctx.beginPath();
+        // Left semicircle
+        this.ctx.arc(-centerDist, 0, radius, Math.PI/2, -Math.PI/2, true);
+        // Right semicircle
+        this.ctx.arc(centerDist, 0, radius, -Math.PI/2, Math.PI/2, true);
+        this.ctx.closePath();
+        this.ctx.stroke();
+        this.ctx.fill();
+    }
 }
-            drawSlot(params) {
-                const { length, width } = params;
-                const radius = width / 2;
-                const centerDist = (length - width) / 2;
-                
-                this.ctx.beginPath();
-                
-                // Left semicircle
-                this.ctx.arc(-centerDist, 0, radius, Math.PI/2, -Math.PI/2, true);
-                
-                // Right semicircle
-                this.ctx.arc(centerDist, 0, radius, -Math.PI/2, Math.PI/2, true);
-                
-                this.ctx.closePath();
-                this.ctx.stroke();
-                this.ctx.fill();
-            }
-        }
         // Setup test environment
         const canvas = document.getElementById('canvas');
         const renderer = new Renderer(canvas);
