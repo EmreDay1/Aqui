@@ -1,5 +1,5 @@
 # Aqui
-Graphical programming language- mainly created for Parametrix
+Graphical programming language- mainly created for IdeaLab Fablab
 
 <img width="980" alt="Screenshot 2025-02-01 at 17 21 51" src="https://github.com/user-attachments/assets/d6f9d09d-f454-4a42-8cbe-7930f766edb1" />
 
