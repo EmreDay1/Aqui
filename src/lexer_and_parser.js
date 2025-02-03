@@ -5,396 +5,495 @@ class Token {
         this.line = line;
         this.column = column;
     }
+
+    toString() {
+        return `Token(${this.type}, ${this.value}) at line ${this.line}, column ${this.column}`;
+    }
 }
 
+// Lexer class definition
 class Lexer {
     constructor(input) {
         this.input = input;
-        this.position = 0;
+        this.pos = 0;
         this.line = 1;
         this.column = 1;
-        this.currentChar = this.input[0];
+        this.current_char = this.input.length > 0 ? this.input[0] : null;
+        this.indentStack = [0];
     }
 
     error(message) {
-        throw new Error(`Lexer error at line ${this.line}, column ${this.column}: ${message}`);
+        throw new Error(`Lexical error at line ${this.line}, column ${this.column}: ${message}`);
     }
 
     advance() {
-        this.position++;
-        if (this.position > this.input.length - 1) {
-            this.currentChar = null;
+        this.pos++;
+        if (this.pos > this.input.length - 1) {
+            this.current_char = null;
         } else {
-            this.currentChar = this.input[this.position];
+            this.current_char = this.input[this.pos];
             this.column++;
         }
     }
 
-    skipComment() {
-        // Skip //
-        this.advance();
-        this.advance();
-        
-        // Skip until end of line
-        while (this.currentChar !== null && this.currentChar !== '\n') {
-            this.advance();
+    peek() {
+        const peekPos = this.pos + 1;
+        if (peekPos > this.input.length - 1) {
+            return null;
         }
-        if (this.currentChar === '\n') {
-            this.line++;
-            this.column = 1;
-            this.advance();
-        }
+        return this.input[peekPos];
     }
 
     skipWhitespace() {
-        while (this.currentChar && /\s/.test(this.currentChar)) {
-            if (this.currentChar === '\n') {
-                this.line++;
-                this.column = 1;
-            }
+        while (this.current_char && /[ \t]/.test(this.current_char)) {
             this.advance();
         }
     }
 
-    number() {
-        let result = '';
-        while (this.currentChar && /\d/.test(this.currentChar)) {
-            result += this.currentChar;
+    skipComment() {
+        while (this.current_char && this.current_char !== '\n') {
             this.advance();
         }
-        if (this.currentChar === '.') {
-            result += this.currentChar;
+    }
+
+    handleNewLine() {
+        this.advance();
+        this.line++;
+        this.column = 1;
+        // Skip empty lines
+        while (this.current_char === '\n') {
             this.advance();
-            while (this.currentChar && /\d/.test(this.currentChar)) {
-                result += this.currentChar;
-                this.advance();
+            this.line++;
+        }
+        return new Token('NEWLINE', '\n', this.line - 1, this.column);
+    }
+
+    handleIndentation() {
+        let spaces = 0;
+        const startColumn = this.column;
+
+        while (this.current_char === ' ' || this.current_char === '\t') {
+            spaces += this.current_char === ' ' ? 1 : 4; // Tab counts as 4 spaces
+            this.advance();
+        }
+
+        // Skip empty lines or comment lines
+        if (this.current_char === '\n' || this.current_char === '#' || 
+            (this.current_char === '/' && this.peek() === '/')) {
+            return null;
+        }
+
+        const currentIndent = this.indentStack[this.indentStack.length - 1];
+
+        if (spaces > currentIndent) {
+            this.indentStack.push(spaces);
+            return new Token('INDENT', spaces, this.line, startColumn);
+        } else if (spaces < currentIndent) {
+            while (spaces < this.indentStack[this.indentStack.length - 1]) {
+                this.indentStack.pop();
+                if (spaces > this.indentStack[this.indentStack.length - 1]) {
+                    this.error('Invalid dedent');
+                }
             }
+            return new Token('DEDENT', spaces, this.line, startColumn);
         }
-        return new Token('NUMBER', parseFloat(result), this.line, this.column);
+        return null;
     }
 
     identifier() {
         let result = '';
-        while (this.currentChar && /[a-zA-Z0-9_.]/.test(this.currentChar)) {
-            result += this.currentChar;
+        const start_column = this.column;
+
+        while (this.current_char && /[a-zA-Z0-9_]/.test(this.current_char)) {
+            result += this.current_char;
             this.advance();
         }
-        
+
         const keywords = {
-            'param': 'PARAM',
-            'shape': 'SHAPE',
+            // Shape types
+            'rectangle': 'SHAPE_TYPE',
+            'circle': 'SHAPE_TYPE',
+            'triangle': 'SHAPE_TYPE',
+            'ellipse': 'SHAPE_TYPE',
+            'text': 'SHAPE_TYPE',
+            'path': 'SHAPE_TYPE',
+            'gear': 'SHAPE_TYPE',
+            'star': 'SHAPE_TYPE',
+            'cross': 'SHAPE_TYPE',
+            'slot': 'SHAPE_TYPE',
+            'arc': 'SHAPE_TYPE',
+            'spiral': 'SHAPE_TYPE',
+            'wave': 'SHAPE_TYPE',
+            'donut': 'SHAPE_TYPE',
+
+            // Structure keywords
             'layer': 'LAYER',
             'transform': 'TRANSFORM',
             'add': 'ADD',
             'subtract': 'SUBTRACT',
-            'rotate': 'ROTATE',
-            'scale': 'SCALE',
-            'position': 'POSITION'
+
+            // Common properties
+            'position': 'PROPERTY',
+            'rotation': 'PROPERTY',
+            'scale': 'PROPERTY',
+            'scaleX': 'PROPERTY',
+            'scaleY': 'PROPERTY',
+
+            // Shape-specific properties
+            'width': 'PROPERTY',
+            'height': 'PROPERTY',
+            'radius': 'PROPERTY',
+            'base': 'PROPERTY',
+            'content': 'PROPERTY',
+            'fontSize': 'PROPERTY',
+            'fontFamily': 'PROPERTY',
+            'points': 'PROPERTY',
+            'startAngle': 'PROPERTY',
+            'endAngle': 'PROPERTY',
+            'thickness': 'PROPERTY',
+            'diameter': 'PROPERTY',
+            'teeth': 'PROPERTY',
+            'outerRadius': 'PROPERTY',
+            'innerRadius': 'PROPERTY',
+            'radiusX': 'PROPERTY',
+            'radiusY': 'PROPERTY',
+            'startRadius': 'PROPERTY',
+            'endRadius': 'PROPERTY',
+            'turns': 'PROPERTY',
+            'amplitude': 'PROPERTY',
+            'frequency': 'PROPERTY',
+            'length': 'PROPERTY'
         };
 
-        const type = keywords[result] || 'IDENTIFIER';
-        return new Token(type, result, this.line, this.column);
+        const tokenType = keywords[result] || 'IDENTIFIER';
+        return new Token(tokenType, result, this.line, start_column);
+    }
+
+    number() {
+        let result = '';
+        const start_column = this.column;
+
+        if (this.current_char === '-') {
+            result += this.current_char;
+            this.advance();
+        }
+
+        while (this.current_char && /\d/.test(this.current_char)) {
+            result += this.current_char;
+            this.advance();
+        }
+
+        if (this.current_char === '.') {
+            result += this.current_char;
+            this.advance();
+
+            while (this.current_char && /\d/.test(this.current_char)) {
+                result += this.current_char;
+                this.advance();
+            }
+        }
+
+        return new Token('NUMBER', parseFloat(result), this.line, start_column);
+    }
+
+    string() {
+        let result = '';
+        const start_column = this.column;
+        this.advance(); // Skip opening quote
+
+        while (this.current_char && this.current_char !== '"') {
+            if (this.current_char === '\\') {
+                this.advance();
+                switch (this.current_char) {
+                    case 'n': result += '\n'; break;
+                    case 't': result += '\t'; break;
+                    case 'r': result += '\r'; break;
+                    case '"': result += '"'; break;
+                    case '\\': result += '\\'; break;
+                    default:
+                        this.error(`Invalid escape sequence \\${this.current_char}`);
+                }
+            } else {
+                result += this.current_char;
+            }
+            this.advance();
+        }
+
+        if (!this.current_char) {
+            this.error('Unterminated string');
+        }
+
+        this.advance(); // Skip closing quote
+        return new Token('STRING', result, this.line, start_column);
     }
 
     getNextToken() {
-        while (this.currentChar !== null) {
-            // Handle comments
-            if (this.currentChar === '/' && this.position + 1 < this.input.length && 
-                this.input[this.position + 1] === '/') {
-                this.skipComment();
-                continue;
+        while (this.current_char !== null) {
+            // Handle indentation at line start
+            if (this.column === 1) {
+                const indentToken = this.handleIndentation();
+                if (indentToken) return indentToken;
             }
 
-            // Skip whitespace
-            if (/\s/.test(this.currentChar)) {
+            // Handle whitespace
+            if (/[ \t]/.test(this.current_char)) {
                 this.skipWhitespace();
                 continue;
             }
 
-            // Numbers
-            if (/\d/.test(this.currentChar)) {
+            // Handle comments
+            if (this.current_char === '#' || 
+               (this.current_char === '/' && this.peek() === '/')) {
+                this.skipComment();
+                continue;
+            }
+
+            // Handle newlines
+            if (this.current_char === '\n') {
+                return this.handleNewLine();
+            }
+
+            // Handle strings
+            if (this.current_char === '"') {
+                return this.string();
+            }
+
+            // Handle numbers
+            if (/\d/.test(this.current_char) || 
+               (this.current_char === '-' && /\d/.test(this.peek()))) {
                 return this.number();
             }
 
-            // Identifiers and keywords
-            if (/[a-zA-Z_]/.test(this.currentChar)) {
+            // Handle identifiers and keywords
+            if (/[a-zA-Z_]/.test(this.current_char)) {
                 return this.identifier();
             }
 
-            // Operators and special characters
-            switch (this.currentChar) {
-                case '{':
-                    this.advance();
-                    return new Token('LBRACE', '{', this.line, this.column);
-                case '}':
-                    this.advance();
-                    return new Token('RBRACE', '}', this.line, this.column);
-                case '[':
-                    this.advance();
-                    return new Token('LBRACKET', '[', this.line, this.column);
-                case ']':
-                    this.advance();
-                    return new Token('RBRACKET', ']', this.line, this.column);
-                case ':':
-                    this.advance();
-                    return new Token('COLON', ':', this.line, this.column);
-                case '*':
-                    this.advance();
-                    return new Token('MULTIPLY', '*', this.line, this.column);
-                case '/':
-                    this.advance();
-                    return new Token('DIVIDE', '/', this.line, this.column);
-                case '+':
-                    this.advance();
-                    return new Token('PLUS', '+', this.line, this.column);
-                case '-':
-                    this.advance();
-                    return new Token('MINUS', '-', this.line, this.column);
-                case '.':
-                    this.advance();
-                    return new Token('DOT', '.', this.line, this.column);
-                case '"':
-                    this.advance();
-                    return new Token('QUOTE', '"', this.line, this.column);
+            // Handle special characters
+            const specialChars = {
+                ':': 'COLON',
+                '[': 'LBRACKET',
+                ']': 'RBRACKET',
+                '{': 'LBRACE',
+                '}': 'RBRACE',
+                '(': 'LPAREN',
+                ')': 'RPAREN',
+                ',': 'COMMA',
+                '+': 'PLUS',
+                '-': 'MINUS',
+                '*': 'MULTIPLY',
+                '/': 'DIVIDE',
+                '.': 'DOT'
+            };
+
+            if (specialChars[this.current_char]) {
+                const token = new Token(
+                    specialChars[this.current_char],
+                    this.current_char,
+                    this.line,
+                    this.column
+                );
+                this.advance();
+                return token;
             }
 
-            this.error(`Unexpected character: ${this.currentChar}`);
+            this.error(`Unexpected character: ${this.current_char}`);
+        }
+
+        // Handle remaining dedents at end of file
+        if (this.indentStack.length > 1) {
+            this.indentStack.pop();
+            return new Token('DEDENT', null, this.line, this.column);
         }
 
         return new Token('EOF', null, this.line, this.column);
     }
-}
 
-// lexer_and_parser.mjs
+    tokenize() {
+        const tokens = [];
+        let token = this.getNextToken();
+        
+        while (token.type !== 'EOF') {
+            tokens.push(token);
+            token = this.getNextToken();
+        }
+        
+        tokens.push(token); // Add EOF token
+        return tokens;
+    }
+}
 class Parser {
     constructor(lexer) {
         this.lexer = lexer;
-        this.currentToken = this.lexer.getNextToken();
-        
-        // Define valid property names
-        this.validProperties = new Set([
-            'width', 'height', 'radius', 'position',
-            'points', 'outerRadius', 'innerRadius',
-            'scale', 'rotate'
-        ]);
+        this.tokens = lexer.tokenize();
+        this.current = 0;
     }
 
     error(message) {
-        throw new Error(`Parser error at line ${this.currentToken.line}, column ${this.currentToken.column}: ${message}`);
+        const token = this.currentToken();
+        throw new Error(`Parser error at line ${token.line}, column ${token.column}: ${message}`);
     }
 
-    eat(tokenType) {
-        if (this.currentToken.type === tokenType) {
-            const token = this.currentToken;
-            this.currentToken = this.lexer.getNextToken();
+    currentToken() {
+        return this.tokens[this.current];
+    }
+
+    peek() {
+        return this.tokens[this.current + 1] || null;
+    }
+
+    eat(expectedType) {
+        const token = this.currentToken();
+        if (token.type === expectedType) {
+            this.current++;
             return token;
-        } else {
-            this.error(`Expected ${tokenType} but got ${this.currentToken.type}`);
+        }
+        this.error(`Expected ${expectedType} but got ${token.type}`);
+    }
+
+    parse() {
+        const statements = [];
+        
+        while (this.current < this.tokens.length && this.currentToken().type !== 'EOF') {
+            // Skip standalone newlines between declarations
+            while (this.currentToken().type === 'NEWLINE') {
+                this.eat('NEWLINE');
+            }
+            
+            if (this.currentToken().type === 'EOF') {
+                break;
+            }
+
+            const statement = this.parseStatement();
+            if (statement) {
+                statements.push(statement);
+            }
+        }
+        
+        return statements;
+    }
+
+    parseStatement() {
+        const token = this.currentToken();
+        
+        switch (token.type) {
+            case 'SHAPE_TYPE':
+                return this.parseShapeDeclaration();
+            case 'LAYER':
+                return this.parseLayer();
+            case 'TRANSFORM':
+                return this.parseTransform();
+            default:
+                this.error(`Unexpected token: ${token.type}`);
         }
     }
 
-    parseParam() {
-        this.eat('PARAM');
-        const name = this.currentToken.value;
-        this.eat('IDENTIFIER');
-        const value = this.parseExpression();
+    parseShapeDeclaration() {
+        const shapeType = this.eat('SHAPE_TYPE').value;
+        const name = this.eat('IDENTIFIER').value;
+        this.eat('NEWLINE');
+        this.eat('INDENT');
+
+        const params = {};
+        while (this.currentToken().type !== 'DEDENT' && this.currentToken().type !== 'EOF') {
+            const { property, value } = this.parseProperty();
+            params[property] = value;
+            
+            if (this.currentToken().type === 'NEWLINE') {
+                this.eat('NEWLINE');
+            }
+        }
+
+        this.eat('DEDENT');
         return {
-            type: 'param',
+            type: 'shape',
+            shapeType,
             name,
-            value
+            params
         };
     }
 
+    parseProperty() {
+        const property = this.eat('PROPERTY').value;
+        this.eat('COLON');
+        const value = this.parseExpression();
+        return { property, value };
+    }
+
     parseExpression() {
-        let node = this.parseTerm();
+        const token = this.currentToken();
 
-        while (this.currentToken.type === 'PLUS' || this.currentToken.type === 'MINUS') {
-            const operator = this.currentToken.type;
-            this.eat(operator);
-            node = {
-                type: 'binary_op',
-                operator: operator.toLowerCase(),
-                left: node,
-                right: this.parseTerm()
-            };
-        }
-
-        return node;
-    }
-
-    parseTerm() {
-        let node = this.parseFactor();
-
-        while (this.currentToken.type === 'MULTIPLY' || this.currentToken.type === 'DIVIDE') {
-            const operator = this.currentToken.type;
-            this.eat(operator);
-            node = {
-                type: 'binary_op',
-                operator: operator.toLowerCase(),
-                left: node,
-                right: this.parseFactor()
-            };
-        }
-
-        return node;
-    }
-
-    parseFactor() {
-        if (this.currentToken.type === 'NUMBER') {
-            const token = this.currentToken;
-            this.eat('NUMBER');
-            return {
-                type: 'number',
-                value: token.value
-            };
-        } else if (this.currentToken.type === 'IDENTIFIER' || this.currentToken.type === 'POSITION') {
-            const name = this.currentToken.value;
-            this.eat(this.currentToken.type);
-            
-            if (this.currentToken.type === 'DOT') {
-                this.eat('DOT');
-                const property = this.currentToken.value;
-                this.eat('IDENTIFIER');
+        switch (token.type) {
+            case 'NUMBER':
                 return {
-                    type: 'param_ref',
-                    name: name,
-                    property: property
+                    type: 'number',
+                    value: this.eat('NUMBER').value
                 };
-            }
-            
-            return {
-                type: 'identifier',
-                name: name
-            };
-        } else if (this.currentToken.type === 'MINUS') {
-            this.eat('MINUS');
-            return {
-                type: 'unary_op',
-                operator: 'minus',
-                operand: this.parseFactor()
-            };
-        } else if (this.currentToken.type === 'LBRACKET') {
-            return this.parseArray();
-        } else if (this.currentToken.type === 'QUOTE') {
-            this.eat('QUOTE');
-            let result = '';
-            
-            // Collect all characters until closing quote
-            while (this.currentToken.type !== 'QUOTE' && this.currentToken.type !== 'EOF') {
-                // Add the current token's value to our string
-                result += this.currentToken.value;
-                // Move to next token
-                this.currentToken = this.lexer.getNextToken();
-                
-                // Add space if not at the end
-                if (this.currentToken.type !== 'QUOTE') {
-                    result += ' ';
-                }
-            }
-            
-            // Eat the closing quote
-            this.eat('QUOTE');
-            
-            return {
-                type: 'string',
-                value: result.trim()
-            };
+
+            case 'STRING':
+                return {
+                    type: 'string',
+                    value: this.eat('STRING').value
+                };
+
+            case 'IDENTIFIER':
+                return {
+                    type: 'identifier',
+                    value: this.eat('IDENTIFIER').value
+                };
+
+            case 'LBRACKET':
+                return this.parseArray();
+
+            case 'MINUS':
+                this.eat('MINUS');
+                const value = this.parseExpression();
+                return {
+                    type: 'unary',
+                    operator: 'minus',
+                    value
+                };
+
+            default:
+                this.error(`Unexpected token in expression: ${token.type}`);
         }
-        
-        this.error(`Unexpected token in factor: ${this.currentToken.type}`);
     }
 
     parseArray() {
         this.eat('LBRACKET');
         const elements = [];
-        
-        while (this.currentToken.type !== 'RBRACKET') {
+
+        while (this.currentToken().type !== 'RBRACKET') {
             elements.push(this.parseExpression());
             
-            if (this.currentToken.type === 'COMMA') {
+            if (this.currentToken().type === 'COMMA') {
                 this.eat('COMMA');
             }
         }
-        
+
         this.eat('RBRACKET');
         return {
             type: 'array',
-            elements: elements
-        };
-    }
-
-    parseShape() {
-        this.eat('SHAPE');
-        const shapeType = this.currentToken.value;
-        this.eat('IDENTIFIER');
-        
-        let shapeName = null;
-        if (this.currentToken.type === 'IDENTIFIER') {
-            shapeName = this.currentToken.value;
-            this.eat('IDENTIFIER');
-        }
-
-        this.eat('LBRACE');
-        const params = {};
-
-        while (this.currentToken.type !== 'RBRACE') {
-            // Accept both IDENTIFIER and special properties like POSITION
-            let paramName;
-            if (this.currentToken.type === 'IDENTIFIER' || this.currentToken.type === 'POSITION') {
-                paramName = this.currentToken.value;
-                this.eat(this.currentToken.type);
-            } else {
-                this.error(`Expected property name but got ${this.currentToken.type}`);
-            }
-
-            this.eat('COLON');
-            params[paramName] = this.parseExpression();
-        }
-        
-        this.eat('RBRACE');
-
-        return {
-            type: 'shape',
-            shapeType,
-            name: shapeName,
-            params
+            elements
         };
     }
 
     parseLayer() {
         this.eat('LAYER');
-        const name = this.currentToken.value;
-        this.eat('IDENTIFIER');
-        
-        this.eat('LBRACE');
-        const commands = [];
+        const name = this.eat('IDENTIFIER').value;
+        this.eat('NEWLINE');
+        this.eat('INDENT');
 
-        while (this.currentToken.type !== 'RBRACE') {
-            if (this.currentToken.type === 'ADD') {
-                this.eat('ADD');
-                commands.push({
-                    type: 'add',
-                    shape: this.currentToken.value
-                });
-                this.eat('IDENTIFIER');
-            } else if (this.currentToken.type === 'SUBTRACT') {
-                this.eat('SUBTRACT');
-                commands.push({
-                    type: 'subtract',
-                    shape: this.currentToken.value
-                });
-                this.eat('IDENTIFIER');
-            } else if (this.currentToken.type === 'ROTATE') {
-                this.eat('ROTATE');
-                commands.push({
-                    type: 'rotate',
-                    angle: this.parseExpression()
-                });
+        const commands = [];
+        while (this.currentToken().type !== 'DEDENT' && this.currentToken().type !== 'EOF') {
+            commands.push(this.parseLayerCommand());
+            
+            if (this.currentToken().type === 'NEWLINE') {
+                this.eat('NEWLINE');
             }
         }
-        
-        this.eat('RBRACE');
 
+        this.eat('DEDENT');
         return {
             type: 'layer',
             name,
@@ -402,34 +501,48 @@ class Parser {
         };
     }
 
+    parseLayerCommand() {
+        const token = this.currentToken();
+
+        switch (token.type) {
+            case 'ADD':
+            case 'SUBTRACT': {
+                const type = token.type.toLowerCase();
+                this.eat(token.type);
+                this.eat('COLON');
+                const shape = this.eat('IDENTIFIER').value;
+                return { type, shape };
+            }
+
+            case 'PROPERTY': {
+                const { property, value } = this.parseProperty();
+                return {
+                    type: property,
+                    value
+                };
+            }
+
+            default:
+                this.error(`Unexpected layer command: ${token.type}`);
+        }
+    }
+
     parseTransform() {
         this.eat('TRANSFORM');
-        const target = this.currentToken.value;
-        this.eat('IDENTIFIER');
-        
-        this.eat('LBRACE');
-        const operations = [];
+        const target = this.eat('IDENTIFIER').value;
+        this.eat('NEWLINE');
+        this.eat('INDENT');
 
-        while (this.currentToken.type !== 'RBRACE') {
-            if (this.currentToken.type === 'SCALE') {
-                this.eat('SCALE');
-                this.eat('COLON');
-                operations.push({
-                    type: 'scale',
-                    value: this.parseExpression()
-                });
-            } else if (this.currentToken.type === 'ROTATE') {
-                this.eat('ROTATE');
-                this.eat('COLON');
-                operations.push({
-                    type: 'rotate',
-                    angle: this.parseExpression()
-                });
+        const operations = [];
+        while (this.currentToken().type !== 'DEDENT' && this.currentToken().type !== 'EOF') {
+            operations.push(this.parseTransformOperation());
+            
+            if (this.currentToken().type === 'NEWLINE') {
+                this.eat('NEWLINE');
             }
         }
-        
-        this.eat('RBRACE');
 
+        this.eat('DEDENT');
         return {
             type: 'transform',
             target,
@@ -437,22 +550,11 @@ class Parser {
         };
     }
 
-    parse() {
-        const statements = [];
-        while (this.currentToken.type !== 'EOF') {
-            if (this.currentToken.type === 'PARAM') {
-                statements.push(this.parseParam());
-            } else if (this.currentToken.type === 'SHAPE') {
-                statements.push(this.parseShape());
-            } else if (this.currentToken.type === 'LAYER') {
-                statements.push(this.parseLayer());
-            } else if (this.currentToken.type === 'TRANSFORM') {
-                statements.push(this.parseTransform());
-            } else {
-                this.error(`Unexpected token: ${this.currentToken.type}`);
-            }
-        }
-        return statements;
+    parseTransformOperation() {
+        const property = this.eat('PROPERTY').value;
+        this.eat('COLON');
+        const value = this.parseExpression();
+        return { type: property, value };
     }
 }
 
