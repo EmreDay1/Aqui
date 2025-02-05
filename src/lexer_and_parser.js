@@ -355,7 +355,7 @@ class Parser {
         const statements = [];
         
         while (this.current < this.tokens.length && this.currentToken().type !== 'EOF') {
-            // Skip standalone newlines between declarations
+            // Skip any number of newlines between declarations
             while (this.currentToken().type === 'NEWLINE') {
                 this.eat('NEWLINE');
             }
@@ -367,6 +367,10 @@ class Parser {
             const statement = this.parseStatement();
             if (statement) {
                 statements.push(statement);
+                // After each statement, consume any trailing newlines
+                while (this.current < this.tokens.length && this.currentToken().type === 'NEWLINE') {
+                    this.eat('NEWLINE');
+                }
             }
         }
         
@@ -391,7 +395,12 @@ class Parser {
     parseShapeDeclaration() {
         const shapeType = this.eat('SHAPE_TYPE').value;
         const name = this.eat('IDENTIFIER').value;
-        this.eat('NEWLINE');
+        
+        // Handle optional newlines after shape declaration
+        if (this.currentToken().type === 'NEWLINE') {
+            this.eat('NEWLINE');
+        }
+        
         this.eat('INDENT');
 
         const params = {};
@@ -399,6 +408,7 @@ class Parser {
             const { property, value } = this.parseProperty();
             params[property] = value;
             
+            // Handle optional newlines between properties
             if (this.currentToken().type === 'NEWLINE') {
                 this.eat('NEWLINE');
             }
@@ -447,11 +457,10 @@ class Parser {
 
             case 'MINUS':
                 this.eat('MINUS');
-                const value = this.parseExpression();
                 return {
-                    type: 'unary',
+                    type: 'unary_op',
                     operator: 'minus',
-                    value
+                    operand: this.parseExpression()
                 };
 
             default:
@@ -481,13 +490,19 @@ class Parser {
     parseLayer() {
         this.eat('LAYER');
         const name = this.eat('IDENTIFIER').value;
-        this.eat('NEWLINE');
+        
+        // Handle optional newlines after layer declaration
+        if (this.currentToken().type === 'NEWLINE') {
+            this.eat('NEWLINE');
+        }
+        
         this.eat('INDENT');
 
         const commands = [];
         while (this.currentToken().type !== 'DEDENT' && this.currentToken().type !== 'EOF') {
             commands.push(this.parseLayerCommand());
             
+            // Handle optional newlines between commands
             if (this.currentToken().type === 'NEWLINE') {
                 this.eat('NEWLINE');
             }
@@ -530,13 +545,19 @@ class Parser {
     parseTransform() {
         this.eat('TRANSFORM');
         const target = this.eat('IDENTIFIER').value;
-        this.eat('NEWLINE');
+        
+        // Handle optional newlines after transform declaration
+        if (this.currentToken().type === 'NEWLINE') {
+            this.eat('NEWLINE');
+        }
+        
         this.eat('INDENT');
 
         const operations = [];
         while (this.currentToken().type !== 'DEDENT' && this.currentToken().type !== 'EOF') {
             operations.push(this.parseTransformOperation());
             
+            // Handle optional newlines between operations
             if (this.currentToken().type === 'NEWLINE') {
                 this.eat('NEWLINE');
             }
@@ -557,5 +578,6 @@ class Parser {
         return { type: property, value };
     }
 }
+
 
 export { Lexer, Parser };
