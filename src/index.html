@@ -4,16 +4,16 @@
     <title>AQUI Visual Test Environment</title>
     <style>
        :root {
-    /* Tokyo Night theme colors */
-    --bg-dark: #1a1b26;
-    --bg-darker: #16161e;
-    --text-primary: #c0caf5;
-    --text-secondary: #a9b1d6;
-    --accent-blue: #7aa2f7;
-    --accent-green: #9ece6a;
-    --accent-red: #f7768e;
-    /* Beige for coord plane */
-    --bg-beige: #f5eee2;
+    /* Vintage technical paper colors */
+    --bg-paper: #fffdf5;
+    --bg-darker: #f5f3e8;
+    --text-primary: #1e1e1e;
+    --text-secondary: #454545;
+    --accent-dark: #2d2d2d;
+    --accent-mid: #696969;
+    --border-color: #b5b3a7;
+    --grid-color: #d6d4c9;
+    --blueprint-blue: #264b78;
 }
 
 * {
@@ -23,64 +23,48 @@
 }
 
 body {
-    font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
-    display: flex;
+    font-family: "Courier New", monospace;
     height: 100vh;
-    background: var(--bg-dark);
+    background: var(--bg-paper);
     color: var(--text-primary);
     overflow: hidden;
+    display: flex;
 }
 
 .panel {
-    height: 100%;
+    height: 100vh;
     display: flex;
     flex-direction: column;
-    transition: width 0.3s ease;
+}
+
+#editor-panel {
+    width: 700px;
+    background: var(--bg-darker);
+    border-right: 2px solid var(--border-color);
+    padding: 1rem;
+    position: relative;
+    z-index: 2;
+    box-shadow: 3px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+#visualization-panel {
+    flex: 1;
+    background: var(--bg-paper);
+    padding: 0;
     position: relative;
     overflow: hidden;
 }
 
-.resize-handle {
-    width: 10px;
-    background: var(--bg-darker);
-    cursor: col-resize;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.resize-handle::after {
-    content: '⋮';
-    color: var(--text-secondary);
-    font-size: 20px;
-}
-
-#editor-panel {
-    width: 40%;
-    background: var(--bg-darker);
-    padding: 20px;
-}
-
-#visualization-panel {
-    width: 60%;
-    background: var(--bg-beige);
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
 #code-editor {
     width: 100%;
-    height: calc(100% - 150px);
-    font-family: 'JetBrains Mono', monospace;
+    height: calc(100% - 140px);
+    font-family: "Courier New", monospace;
     font-size: 14px;
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid var(--bg-dark);
-    background: var(--bg-dark);
+    line-height: 1.5;
+    padding: 1rem;
+    background: var(--bg-paper);
     color: var(--text-primary);
+    border: 1px solid var(--border-color);
     resize: none;
     outline: none;
     white-space: pre;
@@ -88,53 +72,127 @@ body {
 }
 
 #run-button {
-    padding: 10px 20px;
+    width: 100%;
+    padding: 0.75rem;
+    margin: 1rem 0;
+    font-family: "Courier New", monospace;
     font-size: 14px;
-    background: var(--accent-green);
-    color: var(--bg-dark);
+    background: var(--accent-dark);
+    color: var(--bg-paper);
     border: none;
     cursor: pointer;
-    margin-bottom: 10px;
-    transition: opacity 0.3s;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+    text-transform: uppercase;
 }
 
 #run-button:hover {
-    opacity: 0.8;
+    background: var(--blueprint-blue);
 }
 
 #error-display {
-    color: var(--accent-red);
-    margin-top: 10px;
-    white-space: pre-wrap;
-    font-family: 'JetBrains Mono', monospace;
-    max-height: 150px;
+    color: #8b0000;
+    font-family: "Courier New", monospace;
+    font-size: 12px;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+    background: var(--bg-paper);
+    border: 1px solid #8b0000;
+    max-height: 100px;
     overflow: auto;
-    background: var(--bg-dark);
-    padding: 10px;
-    border: 1px solid var(--accent-red);
 }
 
 #output-display {
-    margin-top: 10px;
-    white-space: pre-wrap;
-    font-family: 'JetBrains Mono', monospace;
-    height: 200px;
+    font-family: "Courier New", monospace;
+    font-size: 12px;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+    background: var(--bg-paper);
+    border: 1px solid var(--border-color);
+    height: 100px;
     overflow: auto;
-    padding: 10px;
-    background: var(--bg-dark);
-    color: var(--text-secondary);
-    border: 1px solid var(--bg-dark);
 }
 
 #canvas {
-    border: 2px solid var(--accent-blue);
-    background: white;
-    max-width: 100%;
-    max-height: 600px;
-    aspect-ratio: 4/3;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-paper);
+}
+
+/* Technical paper texture */
+.panel::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        linear-gradient(rgba(185, 183, 173, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(185, 183, 173, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+    pointer-events: none;
+}
+
+.panel-header {
+    font-family: "Courier New", monospace;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+/* Vintage scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-darker);
+    border: 1px solid var(--border-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent-mid);
+    border: 1px solid var(--border-color);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
 }
     </style>
 </head>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/prism.min.js"></script>
+  <script>
+    Prism.languages.aqui = {
+    'comment': /\/\/.*|#.*/,
+    'string': /"(?:\\.|[^\\"])*"/,
+    'keyword': /\b(?:rectangle|circle|triangle|ellipse|text|path|gear|star|cross|slot|arc|spiral|wave|donut|layer|transform|add|subtract|if|else|for|in|range|to|step)\b/,
+    'property': /\b(?:position|rotation|scale|scaleX|scaleY|width|height|radius|base|content|fontSize|fontFamily|points|startAngle|endAngle|thickness|diameter|teeth|outerRadius|innerRadius|radiusX|radiusY|startRadius|endRadius|turns|amplitude|frequency|length|pitch_diameter|pressure_angle|shaft_type|shaft_size)\b/,
+    'shape_type': /\b(?:round|chamfer|all|top|bottom|left|right)\b/,
+    'number': /\b-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?\b/,
+    'boolean': /\b(?:true|false)\b/,
+    'operator': /&&|\|\||==|!=|<=|>=|<|>|\*|\+|\-|\/|%/,
+    'punctuation': /[{}[\];(),.:]/,
+    'function': /\b(?:range)\b/
+};
+
+// Ensure Prism highlights the language
+Prism.languages.insertBefore('aqui', 'comment', {
+    'class-name': {
+        pattern: /\b(?:circle|rectangle|triangle|layer)\b/,
+        alias: 'keyword'
+    }
+});
+  </script>
 </head>
 <body>
     <div id="editor-panel">
@@ -148,7 +206,7 @@ body {
     </div>
 
     <script type="module">
-        import { Lexer, Parser } from './lexer_and_parser.mjs';
+        import { LogicalLexer, LogicalParser } from './logical_lexer_and_parser.mjs';
         import { Interpreter } from './interpreter.mjs';
 
         class Renderer {
@@ -214,6 +272,7 @@ body {
             this.offsetY - worldY * this.scale
         ];
     }
+    
 
     drawShape(shape) {
         const { type, params, transform } = shape;
@@ -378,9 +437,11 @@ body {
         this.ctx.fill();
     }
 
-    drawGear(params) {
-        const { diameter, teeth } = params;
-    const radius = diameter / 2;
+// In Renderer class
+// In Renderer class
+drawGear(params) {
+    const { pitch_diameter, teeth, shaft_config } = params;
+    const radius = pitch_diameter / 2;
     const toothDepth = radius * 0.25;        // Deeper teeth for industrial look
     const toothWidth = (Math.PI * radius * 0.3) / teeth;  // Wider teeth
     const angleStep = (Math.PI * 2) / teeth;
@@ -421,19 +482,26 @@ body {
     this.ctx.stroke();
     this.ctx.fill();
     
-    // Draw inner circle (hub)
+    // Draw shaft
     this.ctx.beginPath();
-    this.ctx.arc(0, 0, innerRadius, 0, Math.PI * 2);
-    this.ctx.stroke();
-    this.ctx.fill();
+    const shaftSize = shaft_config?.size || innerRadius * 0.6;
     
-    // Draw center hole
-    this.ctx.beginPath();
-    this.ctx.arc(0, 0, innerRadius * 0.6, 0, Math.PI * 2);
-    this.ctx.stroke();
+    if (shaft_config?.type === 'square') {
+        const halfSize = shaftSize / 2;
+        this.ctx.moveTo(-halfSize, -halfSize);
+        this.ctx.lineTo(halfSize, -halfSize);
+        this.ctx.lineTo(halfSize, halfSize);
+        this.ctx.lineTo(-halfSize, halfSize);
+        this.ctx.closePath();
+    } else {
+        // Default to circle
+        this.ctx.arc(0, 0, shaftSize / 2, 0, Math.PI * 2);
     }
-
-
+    
+    this.ctx.stroke();
+    this.ctx.fillStyle = 'rgba(150, 150, 150, 0.3)';
+    this.ctx.fill();
+}
 
     
 
@@ -470,8 +538,8 @@ runButton.addEventListener('click', () => {
         const code = editor.value;
 
         // Parse and interpret code
-        const lexer = new Lexer(code);
-        const parser = new Parser(lexer);
+        const lexer = new LogicalLexer(code);
+        const parser = new LogicalParser(lexer);
         const ast = parser.parse();
 
         outputDisplay.textContent = 'AST:\n' + JSON.stringify(ast, null, 2);
@@ -510,5 +578,9 @@ runButton.addEventListener('click', () => {
 // Initial render
 runButton.click();
     </script>
+
+<script>
+    Prism.highlightAll();
+  </script>
 </body>
 </html>
