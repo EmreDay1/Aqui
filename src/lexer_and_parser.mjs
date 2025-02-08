@@ -426,10 +426,16 @@ class Parser {
     parseProperty() {
         const property = this.eat('PROPERTY').value;
         this.eat('COLON');
+        
+        // Special handling for shaft type values
+        if (property === 'shaft_type' && this.currentToken().type === 'SHAFT_TYPE') {
+            const value = this.eat('SHAFT_TYPE').value;
+            return { property, value };
+        }
+        
         const value = this.parseExpression();
         return { property, value };
     }
-
     parseExpression() {
         const token = this.currentToken();
     
