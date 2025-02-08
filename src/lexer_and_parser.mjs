@@ -432,29 +432,29 @@ class Parser {
 
     parseExpression() {
         const token = this.currentToken();
-
+    
         switch (token.type) {
             case 'NUMBER':
                 return {
                     type: 'number',
                     value: this.eat('NUMBER').value
                 };
-
+    
             case 'STRING':
                 return {
                     type: 'string',
                     value: this.eat('STRING').value
                 };
-
+    
             case 'IDENTIFIER':
                 return {
                     type: 'identifier',
                     value: this.eat('IDENTIFIER').value
                 };
-
+    
             case 'LBRACKET':
                 return this.parseArray();
-
+    
             case 'MINUS':
                 this.eat('MINUS');
                 return {
@@ -462,24 +462,56 @@ class Parser {
                     operator: 'minus',
                     operand: this.parseExpression()
                 };
-
+    
+            case 'MULTIPLY':
+            case 'PLUS':
+            case 'MINUS':
+            case 'DIVIDE': {
+                const operator = token.type.toLowerCase();
+                this.eat(token.type);
+                const right = this.parseExpression();
+                return {
+                    type: 'binary_op',
+                    operator,
+                    left: null,  // Will be filled by the parent call
+                    right
+                };
+            }
+    
             default:
                 this.error(`Unexpected token in expression: ${token.type}`);
         }
     }
-
     parseArray() {
         this.eat('LBRACKET');
         const elements = [];
-
+    
         while (this.currentToken().type !== 'RBRACKET') {
-            elements.push(this.parseExpression());
+            let element = this.parseExpression();
+            
+            // Handle binary operations
+            while (this.currentToken().type === 'MULTIPLY' || 
+                   this.currentToken().type === 'PLUS' || 
+                   this.currentToken().type === 'MINUS' || 
+                   this.currentToken().type === 'DIVIDE') {
+                const operator = this.currentToken().type.toLowerCase();
+                this.eat(this.currentToken().type);
+                const right = this.parseExpression();
+                element = {
+                    type: 'binary_op',
+                    operator,
+                    left: element,
+                    right
+                };
+            }
+            
+            elements.push(element);
             
             if (this.currentToken().type === 'COMMA') {
                 this.eat('COMMA');
             }
         }
-
+    
         this.eat('RBRACKET');
         return {
             type: 'array',
@@ -518,7 +550,7 @@ class Parser {
 
     parseLayerCommand() {
         const token = this.currentToken();
-
+    
         switch (token.type) {
             case 'ADD':
             case 'SUBTRACT': {
@@ -528,7 +560,7 @@ class Parser {
                 const shape = this.eat('IDENTIFIER').value;
                 return { type, shape };
             }
-
+    
             case 'PROPERTY': {
                 const { property, value } = this.parseProperty();
                 return {
@@ -536,7 +568,40 @@ class Parser {
                     value
                 };
             }
-
+    
+            // Add explicit cases for transform commands
+            case 'ROTATE':
+            case 'ROTATION': {
+                this.eat(token.type);
+                this.eat('COLON');
+                const value = this.parseExpression();
+                return {
+                    type: 'rotation',
+                    value
+                };
+            }
+    
+            case 'SCALE': {
+                this.eat(token.type);
+                this.eat('COLON');
+                const value = this.parseExpression();
+                return {
+                    type: 'scale',
+                    value
+                };
+            }
+    
+            case 'POSITION':
+            case 'TRANSLATE': {
+                this.eat(token.type);
+                this.eat('COLON');
+                const value = this.parseExpression();
+                return {
+                    type: 'position',
+                    value
+                };
+            }
+    
             default:
                 this.error(`Unexpected layer command: ${token.type}`);
         }
@@ -569,6 +634,8 @@ class Parser {
             target,
             operations
         };
+
+
     }
 
     parseTransformOperation() {
@@ -580,4 +647,4 @@ class Parser {
 }
 
 
-export { Lexer, Parser };
+export { Token, Lexer, Parser };
