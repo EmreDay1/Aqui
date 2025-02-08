@@ -33,12 +33,20 @@ class LogicalLexer extends Lexer {
             'to': 'TO',
             'step': 'STEP',
 
+            'pitch_diameter': 'PROPERTY',
+            'pressure_angle': 'PROPERTY',
+            'shaft_type': 'PROPERTY',
+            'shaft_size': 'PROPERTY',
+
             // Properties
             'position': 'PROPERTY',
             'rotation': 'PROPERTY',
             'scale': 'PROPERTY',
             'scaleX': 'PROPERTY',
             'scaleY': 'PROPERTY',
+
+            'circle': 'SHAFT_TYPE',
+            'square': 'SHAFT_TYPE',
 
             // Shape-specific properties
             'width': 'PROPERTY',
@@ -73,7 +81,21 @@ class LogicalLexer extends Lexer {
             'true': 'BOOLEAN',
             'false': 'BOOLEAN',
             'if': 'IF',
-            'else': 'ELSE'
+            'else': 'ELSE',
+
+            'fillet': 'FILLET',
+            'shape': 'PROPERTY',
+            'fillet_type': 'PROPERTY',
+            'fillet_radius': 'PROPERTY',
+            'round': 'FILLET_TYPE',
+            'chamfer': 'FILLET_TYPE',
+            'radius': 'PROPERTY',
+            'corners': 'PROPERTY',
+            'all': 'CORNER_TYPE',
+            'top': 'CORNER_TYPE',
+            'bottom': 'CORNER_TYPE',
+            'left': 'CORNER_TYPE',
+            'right': 'CORNER_TYPE'
         };
     }
 
@@ -442,39 +464,81 @@ class LogicalParser extends Parser {
     }
 
     // In LogicalParser class
-parseShapeDeclaration() {
-    const shapeType = this.eat('SHAPE_TYPE').value;
-    const baseName = this.eat('IDENTIFIER').value;
-    
-    // Fix: Remove the _i from baseName if it exists
-    const cleanBaseName = baseName.replace('_i', '');
-    // Create shape name using the actual iterator value
-    const shapeName = this.isInLoop ? `${cleanBaseName}_${this.currentIterator}` : baseName;
-
-    if (this.currentToken().type === 'NEWLINE') {
-        this.eat('NEWLINE');
-    }
-    
-    this.eat('INDENT');
-
-    const params = {};
-    while (this.currentToken().type !== 'DEDENT' && this.currentToken().type !== 'EOF') {
-        const { property, value } = this.parseProperty();
-        params[property] = value;
+    parseShapeDeclaration() {
+        const shapeType = this.eat('SHAPE_TYPE').value;
+        const name = this.eat('IDENTIFIER').value;
         
         if (this.currentToken().type === 'NEWLINE') {
             this.eat('NEWLINE');
         }
+        
+        this.eat('INDENT');
+    
+        const params = {};
+        while (this.currentToken().type !== 'DEDENT' && this.currentToken().type !== 'EOF') {
+            // Handle normal properties and shaft configuration
+            if (this.currentToken().type === 'PROPERTY') {
+                const { property, value } = this.parseProperty();
+                
+                // Special handling for shaft-related properties
+                if (property === 'shaft_type' || property === 'shaft_size') {
+                    if (!params.shaft_config) {
+                        params.shaft_config = {};
+                    }
+                    if (property === 'shaft_type') {
+                        params.shaft_config.type = value;
+                    } else {
+                        params.shaft_config.size = value;
+                    }
+                } else {
+                    params[property] = value;
+                }
+            }
+            
+            if (this.currentToken().type === 'NEWLINE') {
+                this.eat('NEWLINE');
+            }
+        }
+    
+        this.eat('DEDENT');
+        return {
+            type: 'shape',
+            shapeType,
+            name,
+            params
+        };
     }
 
-    this.eat('DEDENT');
-    return {
-        type: 'shape',
-        shapeType,
-        name: shapeName,
-        params
-    };
-}
+    parseFillet() {
+        this.eat('FILLET');
+        
+        if (this.currentToken().type === 'NEWLINE') {
+            this.eat('NEWLINE');
+        }
+        
+        this.eat('INDENT');
+    
+        const params = {};
+        while (this.currentToken().type !== 'DEDENT' && this.currentToken().type !== 'EOF') {
+            if (this.currentToken().type === 'PROPERTY') {
+                const { property, value } = this.parseProperty();
+                params[property] = value;
+            }
+            
+            if (this.currentToken().type === 'NEWLINE') {
+                this.eat('NEWLINE');
+            }
+        }
+    
+        this.eat('DEDENT');
+        return {
+            type: 'fillet',
+            params
+        };
+    }
+    
+    
+    
 
     parseStatement() {
         const token = this.currentToken();
@@ -486,6 +550,8 @@ parseShapeDeclaration() {
                 return this.parseForLoop();
             case 'SHAPE_TYPE':
                 return this.parseShapeDeclaration();
+            case 'FILLET':  
+                return this.parseFillet();
             case 'LAYER':
                 return this.parseLayer();
             case 'TRANSFORM':
