@@ -27,6 +27,12 @@ class LogicalLexer extends Lexer {
             'add': 'ADD',
             'subtract': 'SUBTRACT',
 
+            'for': 'FOR',
+            'in': 'IN',
+            'range': 'RANGE',
+            'to': 'TO',
+            'step': 'STEP',
+
             // Properties
             'position': 'PROPERTY',
             'rotation': 'PROPERTY',
@@ -58,6 +64,7 @@ class LogicalLexer extends Lexer {
             'amplitude': 'PROPERTY',
             'frequency': 'PROPERTY',
             'length': 'PROPERTY',
+            'rotation': 'PROPERTY',
 
             // Logical keywords
             'and': 'AND',
@@ -109,18 +116,29 @@ class LogicalLexer extends Lexer {
         return tokens;
     }
 
-    identifier() {
-        let result = '';
-        const start_column = this.column;
+   // In the LogicalLexer class, update the identifier method
+identifier() {
+    let result = '';
+    const start_column = this.column;
 
+    while (this.current_char && /[a-zA-Z0-9_]/.test(this.current_char)) {
+        result += this.current_char;
+        this.advance();
+    }
+
+    // Handle special characters in identifiers
+    if (this.current_char === '_') {
+        result += this.current_char;
+        this.advance();
         while (this.current_char && /[a-zA-Z0-9_]/.test(this.current_char)) {
             result += this.current_char;
             this.advance();
         }
-
-        const tokenType = this.keywords[result] || 'IDENTIFIER';
-        return new Token(tokenType, result, this.line, start_column);
     }
+
+    const tokenType = this.keywords[result] || 'IDENTIFIER';
+    return new Token(tokenType, result, this.line, start_column);
+}
 
     handleIndentation() {
         let spaces = 0;
@@ -346,14 +364,21 @@ class LogicalLexer extends Lexer {
             }
 
             // Handle special characters
+            // Inside getNextToken() method in Lexer class
             const specialChars = {
                 ':': 'COLON',
-                '.': 'DOT',
-                ',': 'COMMA',
                 '[': 'LBRACKET',
                 ']': 'RBRACKET',
+                '{': 'LBRACE',
+                '}': 'RBRACE',
                 '(': 'LPAREN',
-                ')': 'RPAREN'
+                ')': 'RPAREN',
+                ',': 'COMMA',
+                '+': 'PLUS',
+                '-': 'MINUS',
+                '*': 'MULTIPLY',   // Add this
+                '/': 'DIVIDE',     // Add this
+                '.': 'DOT'
             };
 
             if (specialChars[this.current_char]) {
@@ -385,6 +410,8 @@ class LogicalLexer extends Lexer {
 class LogicalParser extends Parser {
     constructor(lexer) {
         super(lexer);
+        this.isInLoop = false;  // Add loop context properties in LogicalParser
+        this.currentIterator = null;
     }
 
     parse() {
@@ -414,12 +441,49 @@ class LogicalParser extends Parser {
         return statements;
     }
 
+    // In LogicalParser class
+parseShapeDeclaration() {
+    const shapeType = this.eat('SHAPE_TYPE').value;
+    const baseName = this.eat('IDENTIFIER').value;
+    
+    // Fix: Remove the _i from baseName if it exists
+    const cleanBaseName = baseName.replace('_i', '');
+    // Create shape name using the actual iterator value
+    const shapeName = this.isInLoop ? `${cleanBaseName}_${this.currentIterator}` : baseName;
+
+    if (this.currentToken().type === 'NEWLINE') {
+        this.eat('NEWLINE');
+    }
+    
+    this.eat('INDENT');
+
+    const params = {};
+    while (this.currentToken().type !== 'DEDENT' && this.currentToken().type !== 'EOF') {
+        const { property, value } = this.parseProperty();
+        params[property] = value;
+        
+        if (this.currentToken().type === 'NEWLINE') {
+            this.eat('NEWLINE');
+        }
+    }
+
+    this.eat('DEDENT');
+    return {
+        type: 'shape',
+        shapeType,
+        name: shapeName,
+        params
+    };
+}
+
     parseStatement() {
         const token = this.currentToken();
         
         switch (token.type) {
             case 'IF':
                 return this.parseIfStatement();
+            case 'FOR':   // Add this case
+                return this.parseForLoop();
             case 'SHAPE_TYPE':
                 return this.parseShapeDeclaration();
             case 'LAYER':
@@ -430,6 +494,7 @@ class LogicalParser extends Parser {
                 this.error(`Unexpected token in statement: ${token.type}`);
         }
     }
+
 
     parseIfStatement() {
         this.eat('IF');
@@ -528,6 +593,61 @@ class LogicalParser extends Parser {
 
         return left;
     }
+
+    parseForLoop() {
+        this.eat('FOR');
+        const iterator = this.eat('IDENTIFIER').value;
+        this.eat('IN');
+        
+        let range;
+        if (this.currentToken().type === 'RANGE') {
+            this.eat('RANGE');
+            this.eat('LPAREN');
+            const start = this.parseExpression();
+            this.eat('COMMA');
+            const end = this.parseExpression();
+            this.eat('RPAREN');
+            range = { type: 'range', start, end };
+        } else {
+            range = this.parseExpression();
+        }
+    
+        this.eat('COLON');
+        if (this.currentToken().type === 'NEWLINE') {
+            this.eat('NEWLINE');
+        }
+        this.eat('INDENT');
+        
+        // Set loop context
+        const oldInLoop = this.isInLoop;
+        const oldIterator = this.currentIterator;
+        this.isInLoop = true;
+        this.currentIterator = iterator;
+        
+        const body = [];
+        while (this.currentToken().type !== 'DEDENT' && 
+               this.currentToken().type !== 'EOF') {
+            body.push(this.parseStatement());
+            if (this.currentToken().type === 'NEWLINE') {
+                this.eat('NEWLINE');
+            }
+        }
+        
+        // Restore previous context
+        this.isInLoop = oldInLoop;
+        this.currentIterator = oldIterator;
+        
+        this.eat('DEDENT');
+    
+        return {
+            type: 'for_loop',
+            iterator,
+            range,
+            body
+        };
+    }
+    
+
 
     parseBasicExpression() {
         const token = this.currentToken();
