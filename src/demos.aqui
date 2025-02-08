@@ -1,11 +1,11 @@
 temporary e.g. storage for now
 
-gear Gear1
-    diameter: 100
-    teeth: 12
-    position: [-100 -100]
-    rotation: 45
-    scale: 1.0
+gear myGear
+    pitch_diameter: 100
+    teeth: 20
+    shaft_type: square
+    shaft_size: 25
+
 
 ||||||||||||||||||||
 
