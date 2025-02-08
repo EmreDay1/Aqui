@@ -4,18 +4,40 @@ class Environment {
     constructor() {
         this.shapes = new Map();
         this.layers = new Map();
+        this.variables = new Map();
         this.currentLayer = null;
+        this.scope = [];
+        this.inLoop = false;      // Add this to track loop context
+        this.loopCounter = 0;     // Add this to track iterations
     }
 
+    // Add methods to manage loop context
+    enterLoop() {
+        this.inLoop = true;
+        this.loopCounter = 0;
+    }
+
+    exitLoop() {
+        this.inLoop = false;
+        this.loopCounter = 0;
+    }
+
+    // Modify createShape to handle loop-specific naming
     createShape(shapeType, name, params) {
-        // Validate required parameters based on shape type
+        // Generate unique name if in loop
+        let finalName = name;
+        if (this.inLoop) {
+            finalName = `${name}_${this.loopCounter}`;
+            this.loopCounter++;
+        }
+
+        // Validate required parameters
         this.validateShapeParams(shapeType, params);
 
-        // Create base shape object
         const shape = {
             type: shapeType,
-            name,
-            id: `${shapeType}_${name}_${Date.now()}`,
+            name: finalName,
+            id: `${shapeType}_${finalName}_${Date.now()}`,
             params: this.normalizeParams(shapeType, params),
             transform: {
                 position: params.position || [0, 0],
@@ -24,13 +46,14 @@ class Environment {
             }
         };
 
-        this.shapes.set(name, shape);
+        this.shapes.set(finalName, shape);
         if (this.currentLayer) {
-            this.currentLayer.shapes.set(name, shape);
+            this.currentLayer.shapes.set(finalName, shape);
         }
 
         return shape;
     }
+
 
     validateShapeParams(shapeType, params) {
         const requiredParams = {
@@ -62,8 +85,6 @@ class Environment {
 
     normalizeParams(shapeType, params) {
         const normalized = { ...params };
-
-        // Default parameters based on shape type
         const defaults = {
             rectangle: { width: 100, height: 100 },
             circle: { radius: 50 },
@@ -74,7 +95,6 @@ class Environment {
             wave: { frequency: 1 }
         };
 
-        // Apply defaults
         if (defaults[shapeType]) {
             Object.assign(normalized, { ...defaults[shapeType], ...params });
         }
@@ -82,6 +102,7 @@ class Environment {
         return normalized;
     }
 
+    // Layer-related methods
     createLayer(name) {
         const layer = {
             name,
@@ -132,6 +153,136 @@ class Environment {
         return layer;
     }
 
+    // Expression evaluation methods
+    // In Environment class in interpreter.mjs
+evaluateExpression(expr) {
+    // Handle raw numbers/values
+    if (typeof expr === 'number') {
+        return expr;
+    }
+    
+    if (!expr || typeof expr !== 'object') {
+        throw new Error(`Invalid expression: ${JSON.stringify(expr)}`);
+    }
+
+    switch (expr.type) {
+        case 'number':
+            return expr.value;
+        case 'string':
+            return expr.value;
+        case 'boolean':
+            return expr.value;
+        case 'array':
+            return expr.elements.map(element => this.evaluateExpression(element));
+        case 'identifier':
+            return this.resolveIdentifier(expr.value);
+        case 'property_access':
+            return this.evaluatePropertyAccess(expr);
+        case 'logical_op':
+            return this.evaluateLogicalOp(expr);
+        case 'comparison_op':
+            return this.evaluateComparisonOp(expr);
+        case 'binary_op':
+            return this.evaluateBinaryOp(expr);
+        case 'unary_op':
+            return this.evaluateUnaryOp(expr);
+        default:
+            throw new Error(`Unknown expression type: ${expr.type}`);
+    }
+}
+
+evaluateBinaryOp(expr) {
+    const left = expr.left.type === 'identifier' ? 
+        this.variables.get(expr.left.value) : 
+        this.evaluateExpression(expr.left);
+    const right = this.evaluateExpression(expr.right);
+
+    switch (expr.operator) {
+        case 'multiply': return left * right;
+        case 'plus': return left + right;
+        case 'minus': return left - right;
+        case 'divide':
+            if (right === 0) throw new Error('Division by zero');
+            return left / right;
+        default:
+            throw new Error(`Unknown binary operator: ${expr.operator}`);
+    }
+}
+
+
+    evaluateLogicalOp(expr) {
+        // For AND operations, evaluate left side first
+        if (expr.operator.toLowerCase() === 'and') {
+            const leftResult = this.evaluateExpression(expr.left);
+            if (!leftResult) return false; // Short circuit if left is false
+            return this.evaluateExpression(expr.right);
+        }
+        // For OR operations, evaluate left side first
+        else if (expr.operator.toLowerCase() === 'or') {
+            const leftResult = this.evaluateExpression(expr.left);
+            if (leftResult) return true; // Short circuit if left is true
+            return this.evaluateExpression(expr.right);
+        }
+
+        throw new Error(`Unknown logical operator: ${expr.operator}`);
+    }
+
+
+    evaluateComparisonOp(expr) {
+        try {
+            const left = this.evaluateExpression(expr.left);
+            const right = this.evaluateExpression(expr.right);
+
+            switch (expr.operator) {
+                case '==': return left === right;
+                case '!=': return left !== right;
+                case '>': return left > right;
+                case '<': return left < right;
+                case '>=': return left >= right;
+                case '<=': return left <= right;
+                default:
+                    throw new Error(`Unknown comparison operator: ${expr.operator}`);
+            }
+        } catch (error) {
+            // If comparison fails, return false
+            return false;
+        }
+    }
+
+    evaluateBinaryOp(expr) {
+        const left = this.evaluateExpression(expr.left);
+        const right = this.evaluateExpression(expr.right);
+
+        switch (expr.operator) {
+            case 'plus': return left + right;
+            case 'minus': return left - right;
+            case 'multiply': return left * right;
+            case 'divide':
+                if (right === 0) throw new Error('Division by zero');
+                return left / right;
+            default:
+                throw new Error(`Unknown binary operator: ${expr.operator}`);
+        }
+    }
+
+    evaluateUnaryOp(expr) {
+        const value = this.evaluateExpression(expr.operand);
+        switch (expr.operator) {
+            case 'minus': return -value;
+            case 'plus': return +value;
+            case 'not': return !value;
+            default:
+                throw new Error(`Unknown unary operator: ${expr.operator}`);
+        }
+    }
+
+    resolveIdentifier(name) {
+        if (this.variables.has(name)) {
+            return this.variables.get(name);
+        }
+        return name;
+    }
+
     applyTransform(target, operations) {
         const targetObj = this.shapes.get(target) || this.layers.get(target);
         if (!targetObj) {
@@ -165,65 +316,43 @@ class Environment {
         return targetObj;
     }
 
-    evaluateExpression(expr) {
-        if (!expr || typeof expr !== 'object') {
-            throw new Error(`Invalid expression: ${JSON.stringify(expr)}`);
+    createRange(start, end, step = 1) {
+        const range = [];
+        for (let i = start; i < end; i += step) {
+            range.push(i);
         }
+        return range;
+    }
 
-        switch (expr.type) {
-            case 'number':
-                return expr.value;
+    pushScope() {
+        this.scope.push(new Map());
+    }
 
-            case 'string':
-                return expr.value;
-
-            case 'array':
-                return expr.elements.map(element => 
-                    this.evaluateExpression(element)
-                );
-
-            case 'identifier':
-                return this.resolveIdentifier(expr.value);
-
-            case 'binary_op':
-                return this.evaluateBinaryOp(expr);
-
-            case 'unary_op':
-                return this.evaluateUnaryOp(expr);
-
-            default:
-                throw new Error(`Unknown expression type: ${expr.type}`);
+    popScope() {
+        if (this.scope.length > 0) {
+            this.scope.pop();
         }
     }
 
-    evaluateBinaryOp(expr) {
-        const left = this.evaluateExpression(expr.left);
-        const right = this.evaluateExpression(expr.right);
-
-        switch (expr.operator) {
-            case 'plus': return left + right;
-            case 'minus': return left - right;
-            case 'multiply': return left * right;
-            case 'divide':
-                if (right === 0) throw new Error('Division by zero');
-                return left / right;
-            default:
-                throw new Error(`Unknown binary operator: ${expr.operator}`);
-        }
-    }
-
-    evaluateUnaryOp(expr) {
-        const value = this.evaluateExpression(expr.operand);
-        switch (expr.operator) {
-            case 'minus': return -value;
-            case 'plus': return +value;
-            default:
-                throw new Error(`Unknown unary operator: ${expr.operator}`);
+    setVariable(name, value) {
+        if (this.scope.length > 0) {
+            this.scope[this.scope.length - 1].set(name, value);
+        } else {
+            this.variables.set(name, value);
         }
     }
 
     resolveIdentifier(name) {
-        // For now, just return the name. Could be expanded for variables
+        // Check scopes from innermost to outermost
+        for (let i = this.scope.length - 1; i >= 0; i--) {
+            if (this.scope[i].has(name)) {
+                return this.scope[i].get(name);
+            }
+        }
+        // Check global variables
+        if (this.variables.has(name)) {
+            return this.variables.get(name);
+        }
         return name;
     }
 }
@@ -253,7 +382,7 @@ class Interpreter {
         if (!node || typeof node !== 'object') {
             throw new Error(`Invalid AST node: ${JSON.stringify(node)}`);
         }
-
+    
         switch (node.type) {
             case 'shape':
                 return this.evaluateShape(node);
@@ -261,9 +390,42 @@ class Interpreter {
                 return this.evaluateLayer(node);
             case 'transform':
                 return this.evaluateTransform(node);
+            case 'if_statement':
+                return this.evaluateIfStatement(node);
+            case 'for_loop':           // Add this case
+                return this.evaluateForLoop(node);
             default:
                 throw new Error(`Unknown node type: ${node.type}`);
         }
+    }
+    
+
+    evaluateForLoop(node) {
+        const { iterator, range, body } = node;
+        const results = [];
+        
+        const start = this.env.evaluateExpression(range.start);
+        const end = this.env.evaluateExpression(range.end);
+        
+        // Enter loop context
+        this.env.enterLoop();
+        
+        for (let i = start; i < end; i++) {
+            this.env.variables.set(iterator, i);
+            
+            for (const statement of body) {
+                const result = this.evaluateNode(statement);
+                if (result !== undefined) {
+                    results.push(result);
+                }
+            }
+        }
+        
+        // Exit loop context
+        this.env.exitLoop();
+        this.env.variables.delete(iterator);
+        
+        return results;
     }
 
     evaluateShape(node) {
@@ -285,7 +447,7 @@ class Interpreter {
                 case 'subtract':
                     this.env.subtractFromLayer(node.name, command.shape);
                     break;
-                case 'rotate':
+                case 'rotation':
                     layer.transform.rotation = this.env.evaluateExpression(command.value);
                     break;
                 case 'scale':
@@ -305,6 +467,20 @@ class Interpreter {
 
     evaluateTransform(node) {
         return this.env.applyTransform(node.target, node.operations);
+    }
+
+    evaluateIfStatement(node) {
+        const condition = this.env.evaluateExpression(node.condition);
+        
+        if (condition) {
+            for (const statement of node.body) {
+                this.evaluateNode(statement);
+            }
+        } else if (node.elseBody) {
+            for (const statement of node.elseBody) {
+                this.evaluateNode(statement);
+            }
+        }
     }
 }
 
