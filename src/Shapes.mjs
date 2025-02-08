@@ -414,13 +414,22 @@ class Cross extends Shape {
 
 // 16. Gear
 class Gear extends Shape {
-    constructor(pitch_diameter, teeth, pressure_angle = 20) {
+    constructor(pitch_diameter, teeth, pressure_angle = 20, shaft_config = { type: 'circle', size: null }) {
         super();
         this.pitch_diameter = pitch_diameter;
         this.teeth = teeth;
         this.pressure_angle = pressure_angle * Math.PI / 180;
         this.addendum = this.pitch_diameter / this.teeth;
         this.dedendum = 1.25 * this.addendum;
+        this.shaft_config = {
+            type: shaft_config.type || 'circle',
+            size: shaft_config.size || (pitch_diameter * 0.2) // Default 20% of pitch diameter
+        };
+
+        // Validate shaft type
+        if (!['circle', 'square'].includes(this.shaft_config.type)) {
+            throw new Error('Invalid shaft type. Must be "circle" or "square"');
+        }
     }
 
     getPoints(points_per_tooth = 4) {
@@ -430,6 +439,7 @@ class Gear extends Shape {
         const outer_radius = pitch_point + this.addendum;
         const root_radius = pitch_point - this.dedendum;
 
+        // Generate gear teeth
         for (let i = 0; i < this.teeth; i++) {
             const angle = (i / this.teeth) * Math.PI * 2;
             for (let j = 0; j < points_per_tooth; j++) {
@@ -445,10 +455,56 @@ class Gear extends Shape {
                 });
             }
         }
+
+        // Add shaft points
+        const shaft_points = this.getShaftPoints();
+        points.push(...shaft_points);
+
         return points.map(p => this.transformPoint(p));
     }
-}
 
+    getShaftPoints() {
+        const points = [];
+        const size = this.shaft_config.size;
+
+        switch (this.shaft_config.type) {
+            case 'circle':
+                // Generate circle points (32 segments)
+                for (let i = 0; i <= 32; i++) {
+                    const angle = (i / 32) * Math.PI * 2;
+                    points.push({
+                        x: Math.cos(angle) * (size / 2),
+                        y: Math.sin(angle) * (size / 2)
+                    });
+                }
+                break;
+
+            case 'square':
+                // Generate square points
+                const half_size = size / 2;
+                points.push(
+                    { x: -half_size, y: -half_size },
+                    { x: half_size, y: -half_size },
+                    { x: half_size, y: half_size },
+                    { x: -half_size, y: half_size },
+                    { x: -half_size, y: -half_size }  // Close the square
+                );
+                break;
+        }
+
+        return points;
+    }
+
+    // Static helper method for gear calculations
+    static calculateSpec(module) {
+        return {
+            pitch_diameter: module * this.teeth,
+            addendum: module,
+            dedendum: 1.25 * module,
+            recommended_shaft_size: module * 3
+        };
+    }
+}
 // 17. Wave
 class Wave extends Shape {
     constructor(width, amplitude, frequency) {
