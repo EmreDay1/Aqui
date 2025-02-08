@@ -1,0 +1,10 @@
+path triangle1
+    points: [[-40, 40], [0, -40], [40, 40]]
+    position: [-150, 0]
+    rotation: 45
+    scale: 1.2
+layer designLayer
+    add: triangle1
+    rotation: 30
+    scale: 1.5
+    position: [100, 100]
