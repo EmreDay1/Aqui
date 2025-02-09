@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AQUI Visual Test Environment</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      font-family: monospace;
+      background: #f0f0f0;
+    }
+    #editor-panel {
+      width: 40%;
+      padding: 20px;
+    }
+    #visualization-panel {
+      width: 60%;
+      padding: 20px;
+    }
+    #code-editor {
+      width: 100%;
+      height: 400px;
+      font-family: monospace;
+      font-size: 14px;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      background: #fff;
+      resize: vertical;
+    }
+    #run-button {
+      padding: 10px 20px;
+      font-size: 14px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    #error-display {
+      color: red;
+      margin-top: 10px;
+      white-space: pre-wrap;
+      font-family: monospace;
+    }
+    #output-display {
+      margin-top: 10px;
+      white-space: pre-wrap;
+      font-family: monospace;
+      height: 200px;
+      overflow: auto;
+      padding: 10px;
+      background: white;
+      border: 1px solid #ccc;
+    }
+    #canvas {
+      border: 1px solid #ccc;
+      background: white;
+    }
+  </style>
+</head>
+<body>
+  <div id="editor-panel">
+    <textarea id="code-editor">// Gear Example DSL
+param gearDiameter 100
+param gearTeeth 20
+
+// Define a gear shape with a square shaft
+shape gear myGear {
+  diameter: param.gearDiameter
+  teeth: param.gearTeeth
+  shaft: "square"
+  shaftSize: 20
+  position: [50, 50]
+}
+    </textarea>
+    <button id="run-button">Run</button>
+    <div id="error-display"></div>
+    <div id="output-display"></div>
+  </div>
+  <div id="visualization-panel">
+    <canvas id="canvas" width="800" height="600"></canvas>
+  </div>
+
+  <script type="module">
+    // Wrap all imports and setup code in an async IIFE with error handling.
+    (async () => {
+      try {
+        // Since index.html is in src, use relative paths from here.
+        const { Lexer } = await import('./lexer.mjs');
+        const { Parser } = await import('./parser.mjs');
+        const { Interpreter } = await import('./interpreter.mjs');
+        const { Renderer } = await import('./renderer.mjs');
+        // Optionally, if you use Shapes, import it too:
+        // const { SomeShapeFunction } = await import('./Shapes.mjs');
+
+        // Set up DOM elements.
+        const canvas = document.getElementById('canvas');
+        const renderer = new Renderer(canvas);
+        const editor = document.getElementById('code-editor');
+        const runButton = document.getElementById('run-button');
+        const errorDisplay = document.getElementById('error-display');
+        const outputDisplay = document.getElementById('output-display');
+
+        // Event handler for the Run button.
+        runButton.addEventListener('click', () => {
+          try {
+            // Clear any previous error or output messages.
+            errorDisplay.textContent = '';
+            outputDisplay.textContent = '';
+
+            // Clear the canvas (grid, axes, etc.).
+            renderer.clear();
+
+            // Read the DSL code from the editor.
+            const code = editor.value;
+
+            // Create the lexer and parser.
+            const lexer = new Lexer(code);
+            const parser = new Parser(lexer);
+            const ast = parser.parse();
+
+            // Show the AST output.
+            outputDisplay.textContent = 'AST:\n' + JSON.stringify(ast, null, 2);
+
+            // Interpret the AST.
+            const interpreter = new Interpreter();
+            const result = interpreter.interpret(ast);
+
+            // Draw any standalone shapes.
+            for (const shape of result.shapes.values()) {
+              renderer.drawShape(shape);
+            }
+
+            // Draw shapes in layers, applying layer transforms.
+            for (const layer of result.layers.values()) {
+              const { transform } = layer;
+              for (const shape of layer.shapes.values()) {
+                const combinedShape = {
+                  ...shape,
+                  transform: {
+                    position: shape.transform.position,
+                    rotation: (shape.transform.rotation || 0) + (transform.rotation || 0),
+                    scale: [
+                      shape.transform.scale[0] * transform.scale[0],
+                      shape.transform.scale[1] * transform.scale[1]
+                    ]
+                  }
+                };
+                renderer.drawShape(combinedShape);
+              }
+            }
+          } catch (runError) {
+            errorDisplay.textContent = `Runtime Error: ${runError.message}\n${runError.stack}`;
+            console.error(runError);
+          }
+        });
+
+        // Optionally, auto-run on page load.
+        runButton.click();
+      } catch (importError) {
+        const errorDisplay = document.getElementById('error-display');
+        errorDisplay.textContent = `Error loading modules: ${importError.message}\n${importError.stack}`;
+        console.error('Module import error:', importError);
+      }
+    })();
+  </script>
+</body>
+</html>
