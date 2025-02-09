@@ -1,7 +1,0 @@
-for i in range(0, 3):
-    rectangle rect_i
-        width: 30
-        height: 30
-        position: [i * 200, 0]
-transform rect_i_1
-    scale: 1.5

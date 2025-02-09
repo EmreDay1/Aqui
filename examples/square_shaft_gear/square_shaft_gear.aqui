@@ -1,5 +1,0 @@
-gear myGear
-    pitch_diameter: 100
-    teeth: 20
-    shaft_type: square
-    shaft_size: 25
