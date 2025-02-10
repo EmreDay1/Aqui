@@ -1,8 +1,16 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>AQUI Visual Test Environment</title>
+  
+  <!-- CodeMirror Dependencies -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/mode/simple.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/comment/comment.min.js"></script>
+
   <style>
     * {
       margin: 0;
@@ -21,7 +29,7 @@
       font-family: monospace;
       background: #fff;
     }
-    
+
     .header {
       height: 48px;
       display: flex;
@@ -39,7 +47,7 @@
     .main-content {
       flex: 1;
       display: flex;
-      min-height: 0; /* Important for preventing flex overflow */
+      min-height: 0;
     }
 
     .editor-panel {
@@ -49,16 +57,10 @@
       border-right: 1px solid #ccc;
     }
 
-    .code-editor {
-      flex: 1;
-      width: 100%;
-      padding: 16px;
-      font-family: monospace;
+    .CodeMirror {
+      height: 100%;
       font-size: 14px;
-      border: none;
-      resize: none;
       background: #fdf6e3;
-      outline: none;
     }
 
     .visualization-panel {
@@ -114,24 +116,6 @@
     .ast-panel.visible {
       display: block;
     }
-
-    /* Hide scrollbar but keep functionality */
-    .ast-panel::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    .ast-panel::-webkit-scrollbar-track {
-      background: #f1f1f1;
-    }
-
-    .ast-panel::-webkit-scrollbar-thumb {
-      background: #888;
-      border-radius: 4px;
-    }
-
-    .ast-panel::-webkit-scrollbar-thumb:hover {
-      background: #555;
-    }
   </style>
 </head>
 <body>
@@ -141,7 +125,7 @@
 
   <div class="main-content">
     <div class="editor-panel">
-      <textarea class="code-editor" id="code-editor">//Aqui</textarea>
+      <textarea id="code-editor">// Aqui</textarea>
     </div>
     <div class="visualization-panel">
       <canvas id="canvas"></canvas>
@@ -153,11 +137,34 @@
   </div>
 
   <div class="footer">
-    <button class="button" id="run-button">run (Shift + Enter)</button>
-    <button class="button" id="view-ast">view</button>
+    <button class="button" id="run-button">Run (Shift + Enter)</button>
+    <button class="button" id="view-ast">View AST</button>
   </div>
 
-  <script type="module">
+  <script>
+    // Define Aqui syntax for CodeMirror
+    CodeMirror.defineSimpleMode("aqui", {
+      start: [
+        { regex: /\/\/.*/, token: "comment" },    // Comments
+        { regex: /\b(param|shape|layer|transform|add|subtract|rotate|scale|position)\b/, token: "keyword" },
+        { regex: /\b\d+(\.\d+)?\b/, token: "number" },  // Numbers
+        { regex: /"(?:[^\\]|\\.)*?"/, token: "string" },  // Strings
+        { regex: /[\{\}\[\]:,]/, token: "operator" }  // Operators
+      ]
+    });
+
+    // Initialize CodeMirror
+    const editor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+      mode: "aqui",
+      theme: "default",
+      lineNumbers: true,
+      autoCloseBrackets: true,
+      matchBrackets: true
+    });
+
+    // Preload example code
+    editor.setValue(`//Aqui`);
+
     (async () => {
       try {
         const { Lexer } = await import('./lexer.mjs');
@@ -167,7 +174,6 @@
 
         const canvas = document.getElementById('canvas');
         const renderer = new Renderer(canvas);
-        const editor = document.getElementById('code-editor');
         const runButton = document.getElementById('run-button');
         const viewAstButton = document.getElementById('view-ast');
         const astPanel = document.getElementById('ast-panel');
@@ -176,7 +182,7 @@
         function runCode() {
           try {
             renderer.clear();
-            const code = editor.value;
+            const code = editor.getValue();
             const lexer = new Lexer(code);
             const parser = new Parser(lexer);
             const ast = parser.parse();
@@ -216,21 +222,18 @@
           astPanel.classList.toggle('visible');
         });
 
-        editor.addEventListener('keydown', (e) => {
-          if (e.shiftKey && e.key === 'Enter') {
-            e.preventDefault();
+        editor.on("keydown", (cm, event) => {
+          if (event.shiftKey && event.key === "Enter") {
+            event.preventDefault();
             runCode();
           }
         });
 
-        // Initial run
-        runCode();
-
-        // Handle window resize
-        window.addEventListener('resize', () => {
+        window.addEventListener("resize", () => {
           renderer.setupCanvas();
           runCode();
         });
+
       } catch (error) {
         console.error('Module import error:', error);
       }
