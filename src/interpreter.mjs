@@ -21,13 +21,36 @@ export class Interpreter {
 
   evaluateNode(node) {
     switch (node.type) {
-      case 'param':      return this.evaluateParam(node);
-      case 'shape':      return this.evaluateShape(node);
-      case 'layer':      return this.evaluateLayer(node);
-      case 'transform':  return this.evaluateTransform(node);
+      case 'param':        return this.evaluateParam(node);
+      case 'shape':        return this.evaluateShape(node);
+      case 'layer':        return this.evaluateLayer(node);
+      case 'transform':    return this.evaluateTransform(node);
+      case 'if_statement': return this.evaluateIfStatement(node);
       default:
         throw new Error(`Unknown node type: ${node.type}`);
     }
+  }
+
+  evaluateIfStatement(node) {
+    const condition = this.evaluateExpression(node.condition);
+    if (this.isTruthy(condition)) {
+      for (const statement of node.thenBranch) {
+        this.evaluateNode(statement);
+      }
+    } else if (node.elseBranch && node.elseBranch.length > 0) {
+      for (const statement of node.elseBranch) {
+        this.evaluateNode(statement);
+      }
+    }
+  }
+
+  isTruthy(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'string') return value.length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    if (value === null || value === undefined) return false;
+    return true;
   }
 
   evaluateParam(node) {
@@ -101,8 +124,9 @@ export class Interpreter {
 
   evaluateExpression(expr) {
     switch (expr.type) {
-      case 'number': return expr.value;
-      case 'string': return expr.value;
+      case 'number':   return expr.value;
+      case 'string':   return expr.value;
+      case 'boolean':  return expr.value;
       case 'identifier': {
         if (expr.name.startsWith('param.')) {
           const paramName = expr.name.split('.')[1];
@@ -110,6 +134,8 @@ export class Interpreter {
         }
         return this.env.getParameter(expr.name);
       }
+      case 'comparison': return this.evaluateComparison(expr);
+      case 'logical_op': return this.evaluateLogicalOp(expr);
       case 'binary_op': {
         const left = this.evaluateExpression(expr.left);
         const right = this.evaluateExpression(expr.right);
@@ -117,6 +143,7 @@ export class Interpreter {
       }
       case 'unary_op': {
         const operand = this.evaluateExpression(expr.operand);
+        if (expr.operator === 'not') return !this.isTruthy(operand);
         return expr.operator === 'minus' ? -operand : +operand;
       }
       case 'array':
@@ -124,6 +151,36 @@ export class Interpreter {
       default:
         throw new Error(`Unknown expression type: ${expr.type}`);
     }
+  }
+
+  evaluateComparison(expr) {
+    const left = this.evaluateExpression(expr.left);
+    const right = this.evaluateExpression(expr.right);
+    
+    switch (expr.operator) {
+      case 'equals':         return left === right;
+      case 'not_equals':     return left !== right;
+      case 'less':          return left < right;
+      case 'less_equals':    return left <= right;
+      case 'greater':       return left > right;
+      case 'greater_equals': return left >= right;
+      default:
+        throw new Error(`Unknown comparison operator: ${expr.operator}`);
+    }
+  }
+
+  evaluateLogicalOp(expr) {
+    const left = this.evaluateExpression(expr.left);
+    
+    // Short-circuit evaluation
+    if (expr.operator === 'and') {
+      return this.isTruthy(left) ? this.isTruthy(this.evaluateExpression(expr.right)) : false;
+    }
+    if (expr.operator === 'or') {
+      return this.isTruthy(left) ? true : this.isTruthy(this.evaluateExpression(expr.right));
+    }
+    
+    throw new Error(`Unknown logical operator: ${expr.operator}`);
   }
 
   evaluateBinaryOp(operator, left, right) {
@@ -139,4 +196,3 @@ export class Interpreter {
     }
   }
 }
-
