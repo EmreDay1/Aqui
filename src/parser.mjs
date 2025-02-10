@@ -21,6 +21,63 @@ export class Parser {
     }
   }
 
+  // New method for parsing conditional expressions
+  parseCondition() {
+    let expr = this.parseLogicalOr();
+    return expr;
+  }
+
+  // Parse logical OR operations
+  parseLogicalOr() {
+    let expr = this.parseLogicalAnd();
+
+    while (this.currentToken.type === 'OR') {
+      const operator = this.currentToken.type;
+      this.eat('OR');
+      expr = {
+        type: 'logical_op',
+        operator: 'or',
+        left: expr,
+        right: this.parseLogicalAnd()
+      };
+    }
+    return expr;
+  }
+
+  // Parse logical AND operations
+  parseLogicalAnd() {
+    let expr = this.parseComparison();
+
+    while (this.currentToken.type === 'AND') {
+      const operator = this.currentToken.type;
+      this.eat('AND');
+      expr = {
+        type: 'logical_op',
+        operator: 'and',
+        left: expr,
+        right: this.parseComparison()
+      };
+    }
+    return expr;
+  }
+
+  // Parse comparison operations
+  parseComparison() {
+    let expr = this.parseExpression();
+
+    if (['EQUALS', 'NOT_EQUALS', 'LESS', 'LESS_EQUALS', 'GREATER', 'GREATER_EQUALS'].includes(this.currentToken.type)) {
+      const operator = this.currentToken.type.toLowerCase();
+      this.eat(this.currentToken.type);
+      expr = {
+        type: 'comparison',
+        operator,
+        left: expr,
+        right: this.parseExpression()
+      };
+    }
+    return expr;
+  }
+
   parseExpression() {
     let node = this.parseTerm();
     while (this.currentToken.type === 'PLUS' || this.currentToken.type === 'MINUS') {
@@ -53,10 +110,27 @@ export class Parser {
 
   parseFactor() {
     const token = this.currentToken;
+    
     if (token.type === 'NUMBER') {
       this.eat('NUMBER');
       return { type: 'number', value: token.value };
-    } else if (token.type === 'IDENTIFIER' || token.type === 'POSITION') {
+    } 
+    
+    if (token.type === 'TRUE' || token.type === 'FALSE') {
+      this.eat(token.type);
+      return { type: 'boolean', value: token.type === 'TRUE' };
+    }
+    
+    if (token.type === 'NOT') {
+      this.eat('NOT');
+      return {
+        type: 'unary_op',
+        operator: 'not',
+        operand: this.parseFactor()
+      };
+    }
+    
+    if (token.type === 'IDENTIFIER' || token.type === 'POSITION') {
       const name = token.value;
       this.eat(token.type);
       if (this.currentToken.type === 'DOT') {
@@ -66,17 +140,60 @@ export class Parser {
         return { type: 'param_ref', name, property: prop };
       }
       return { type: 'identifier', name };
-    } else if (token.type === 'MINUS') {
+    }
+    
+    if (token.type === 'MINUS') {
       this.eat('MINUS');
       return { type: 'unary_op', operator: 'minus', operand: this.parseFactor() };
-    } else if (token.type === 'LBRACKET') {
+    }
+    
+    if (token.type === 'LBRACKET') {
       return this.parseArray();
-    } else if (token.type === 'QUOTE') {
+    }
+    
+    if (token.type === 'QUOTE') {
       return this.parseStringLiteral();
     }
+    
+    if (token.type === 'LPAREN') {
+      this.eat('LPAREN');
+      const expr = this.parseCondition();
+      this.eat('RPAREN');
+      return expr;
+    }
+    
     this.error(`Unexpected token in factor: ${token.type}`);
   }
 
+  // New method for parsing if statements
+  parseIfStatement() {
+    this.eat('IF');
+    const condition = this.parseCondition();
+    this.eat('LBRACE');
+    
+    const thenBranch = [];
+    while (this.currentToken.type !== 'RBRACE' && this.currentToken.type !== 'EOF') {
+      thenBranch.push(this.parseStatement());
+    }
+    this.eat('RBRACE');  // Make sure we consume the closing brace
+    
+    let elseBranch = [];
+    if (this.currentToken.type === 'ELSE') {
+      this.eat('ELSE');
+      this.eat('LBRACE');
+      while (this.currentToken.type !== 'RBRACE' && this.currentToken.type !== 'EOF') {
+        elseBranch.push(this.parseStatement());
+      }
+      this.eat('RBRACE');
+    }
+    
+    return {
+      type: 'if_statement',
+      condition,
+      thenBranch,
+      elseBranch
+    };
+  }
   parseStringLiteral() {
     let result = '';
     let t = this.lexer.getNextToken();
@@ -93,9 +210,7 @@ export class Parser {
     const elements = [];
     while (this.currentToken.type !== 'RBRACKET') {
       elements.push(this.parseExpression());
-      if (this.currentToken.type === 'COMMA') {
-        this.eat('COMMA');
-      }
+
     }
     this.eat('RBRACKET');
     return { type: 'array', elements };
@@ -140,7 +255,9 @@ export class Parser {
     this.eat('LBRACE');
     const commands = [];
     while (this.currentToken.type !== 'RBRACE') {
-      if (this.currentToken.type === 'ADD') {
+      if (this.currentToken.type === 'IF') {
+        commands.push(this.parseIfStatement());
+      } else if (this.currentToken.type === 'ADD') {
         this.eat('ADD');
         commands.push({ type: 'add', shape: this.currentToken.value });
         this.eat('IDENTIFIER');
@@ -166,7 +283,9 @@ export class Parser {
     this.eat('LBRACE');
     const operations = [];
     while (this.currentToken.type !== 'RBRACE') {
-      if (this.currentToken.type === 'SCALE') {
+      if (this.currentToken.type === 'IF') {
+        operations.push(this.parseIfStatement());
+      } else if (this.currentToken.type === 'SCALE') {
         this.eat('SCALE');
         this.eat('COLON');
         operations.push({ type: 'scale', value: this.parseExpression() });
@@ -186,27 +305,51 @@ export class Parser {
     return { type: 'transform', target, operations };
   }
 
+  parseStatement() {
+    let statement;
+    switch (this.currentToken.type) {
+      case 'IF':
+        statement = this.parseIfStatement();
+        break;
+      case 'PARAM':
+        statement = this.parseParam();
+        break;
+      case 'SHAPE':
+        statement = this.parseShape();
+        break;
+      case 'LAYER':
+        statement = this.parseLayer();
+        break;
+      case 'TRANSFORM':
+        statement = this.parseTransform();
+        break;
+      case 'ADD':
+        this.eat('ADD');
+        statement = { 
+          type: 'add', 
+          shape: this.currentToken.value 
+        };
+        this.eat('IDENTIFIER');
+        break;
+      case 'ROTATE':
+        this.eat('ROTATE');
+        this.eat('COLON');
+        statement = {
+          type: 'rotate',
+          angle: this.parseExpression()
+        };
+        break;
+      default:
+        this.error(`Unexpected token: ${this.currentToken.type}`);
+    }
+    return statement;
+  }
+
   parse() {
     const statements = [];
     while (this.currentToken.type !== 'EOF') {
-      switch (this.currentToken.type) {
-        case 'PARAM':
-          statements.push(this.parseParam());
-          break;
-        case 'SHAPE':
-          statements.push(this.parseShape());
-          break;
-        case 'LAYER':
-          statements.push(this.parseLayer());
-          break;
-        case 'TRANSFORM':
-          statements.push(this.parseTransform());
-          break;
-        default:
-          this.error(`Unexpected token: ${this.currentToken.type}`);
-      }
+      statements.push(this.parseStatement());
     }
     return statements;
   }
 }
-
