@@ -6,135 +6,157 @@
   <style>
     body {
       margin: 0;
-      padding: 20px;
+      padding: 0;
+      font-family: monospace;
       display: flex;
-      font-family: monospace;
-      background: #f0f0f0;
-    }
-    #editor-panel {
-      width: 40%;
-      padding: 20px;
-    }
-    #visualization-panel {
-      width: 60%;
-      padding: 20px;
-    }
-    #code-editor {
-      width: 100%;
-      height: 400px;
-      font-family: monospace;
-      font-size: 14px;
-      padding: 10px;
-      margin-bottom: 10px;
-      border: 1px solid #ccc;
+      flex-direction: column;
+      height: 100vh;
       background: #fff;
-      resize: vertical;
     }
-    #run-button {
-      padding: 10px 20px;
-      font-size: 14px;
-      background: #4CAF50;
-      color: white;
-      border: none;
-      cursor: pointer;
-      margin-bottom: 10px;
-    }
-    #error-display {
-      color: red;
-      margin-top: 10px;
-      white-space: pre-wrap;
-      font-family: monospace;
-    }
-    #output-display {
-      margin-top: 10px;
-      white-space: pre-wrap;
-      font-family: monospace;
-      height: 200px;
-      overflow: auto;
+    
+    .header {
+      display: flex;
+      align-items: center;
       padding: 10px;
-      background: white;
-      border: 1px solid #ccc;
+      border-bottom: 1px solid #ccc;
+      background: #f8f8f8;
     }
-    #canvas {
-      border: 1px solid #ccc;
+
+    .logo {
+      font-weight: bold;
+      font-size: 18px;
+      margin-right: 20px;
+    }
+
+    .main-content {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 90px);
+    }
+
+    .editor-panel {
+      width: 50%;
+      border-right: 1px solid #ccc;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .code-editor {
+      flex: 1;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 14px;
+      border: none;
+      resize: none;
+      background: #fdf6e3;
+    }
+
+    .visualization-panel {
+      width: 50%;
+      padding: 20px;
+      background: #fff;
+    }
+
+    .canvas-container {
+      border: 1px dashed #000;
+      height: 100%;
+    }
+
+    .footer {
+      display: flex;
+      padding: 10px;
+      border-top: 1px solid #ccc;
+      background: #f8f8f8;
+    }
+
+    .button {
+      padding: 8px 16px;
+      margin-right: 10px;
+      font-family: monospace;
+      border: none;
+      background: #e0e0e0;
+      cursor: pointer;
+    }
+
+    .button:hover {
+      background: #d0d0d0;
+    }
+
+    .ast-panel {
+      position: fixed;
+      bottom: 40px;
+      left: 0;
+      right: 0;
+      height: 200px;
       background: white;
+      border-top: 1px solid #ccc;
+      padding: 10px;
+      display: none;
+      overflow: auto;
+    }
+
+    .ast-panel.visible {
+      display: block;
     }
   </style>
 </head>
 <body>
-  <div id="editor-panel">
-    <textarea id="code-editor">// Gear Example DSL
-param gearDiameter 100
-param gearTeeth 20
-
-// Define a gear shape with a square shaft
-shape gear myGear {
-  diameter: param.gearDiameter
-  teeth: param.gearTeeth
-  shaft: "square"
-  shaftSize: 20
-  position: [50, 50]
-}
-    </textarea>
-    <button id="run-button">Run</button>
-    <div id="error-display"></div>
-    <div id="output-display"></div>
+  <div class="header">
+    <div class="logo">Domine, non nisi Te</div>
   </div>
-  <div id="visualization-panel">
-    <canvas id="canvas" width="800" height="600"></canvas>
+
+  <div class="main-content">
+    <div class="editor-panel">
+      <textarea class="code-editor" id="code-editor">// AQUI</textarea>
+    </div>
+    <div class="visualization-panel">
+      <div class="canvas-container">
+        <canvas id="canvas" width="800" height="600"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="ast-panel" id="ast-panel">
+    <pre id="ast-output"></pre>
+  </div>
+
+  <div class="footer">
+    <button class="button" id="run-button">run (Shift + Enter)</button>
+    <button class="button" id="view-ast">view</button>
   </div>
 
   <script type="module">
-    // Wrap all imports and setup code in an async IIFE with error handling.
     (async () => {
       try {
-        // Since index.html is in src, use relative paths from here.
         const { Lexer } = await import('./lexer.mjs');
         const { Parser } = await import('./parser.mjs');
         const { Interpreter } = await import('./interpreter.mjs');
         const { Renderer } = await import('./renderer.mjs');
-        // Optionally, if you use Shapes, import it too:
-        // const { SomeShapeFunction } = await import('./Shapes.mjs');
 
-        // Set up DOM elements.
         const canvas = document.getElementById('canvas');
         const renderer = new Renderer(canvas);
         const editor = document.getElementById('code-editor');
         const runButton = document.getElementById('run-button');
-        const errorDisplay = document.getElementById('error-display');
-        const outputDisplay = document.getElementById('output-display');
+        const viewAstButton = document.getElementById('view-ast');
+        const astPanel = document.getElementById('ast-panel');
+        const astOutput = document.getElementById('ast-output');
 
-        // Event handler for the Run button.
-        runButton.addEventListener('click', () => {
+        function runCode() {
           try {
-            // Clear any previous error or output messages.
-            errorDisplay.textContent = '';
-            outputDisplay.textContent = '';
-
-            // Clear the canvas (grid, axes, etc.).
             renderer.clear();
-
-            // Read the DSL code from the editor.
             const code = editor.value;
-
-            // Create the lexer and parser.
             const lexer = new Lexer(code);
             const parser = new Parser(lexer);
             const ast = parser.parse();
+            astOutput.textContent = JSON.stringify(ast, null, 2);
 
-            // Show the AST output.
-            outputDisplay.textContent = 'AST:\n' + JSON.stringify(ast, null, 2);
-
-            // Interpret the AST.
             const interpreter = new Interpreter();
             const result = interpreter.interpret(ast);
 
-            // Draw any standalone shapes.
             for (const shape of result.shapes.values()) {
               renderer.drawShape(shape);
             }
 
-            // Draw shapes in layers, applying layer transforms.
             for (const layer of result.layers.values()) {
               const { transform } = layer;
               for (const shape of layer.shapes.values()) {
@@ -152,18 +174,27 @@ shape gear myGear {
                 renderer.drawShape(combinedShape);
               }
             }
-          } catch (runError) {
-            errorDisplay.textContent = `Runtime Error: ${runError.message}\n${runError.stack}`;
-            console.error(runError);
+          } catch (error) {
+            console.error(error);
+          }
+        }
+
+        runButton.addEventListener('click', runCode);
+        viewAstButton.addEventListener('click', () => {
+          astPanel.classList.toggle('visible');
+        });
+
+        editor.addEventListener('keydown', (e) => {
+          if (e.shiftKey && e.key === 'Enter') {
+            e.preventDefault();
+            runCode();
           }
         });
 
-        // Optionally, auto-run on page load.
-        runButton.click();
-      } catch (importError) {
-        const errorDisplay = document.getElementById('error-display');
-        errorDisplay.textContent = `Error loading modules: ${importError.message}\n${importError.stack}`;
-        console.error('Module import error:', importError);
+        // Initial run
+        runCode();
+      } catch (error) {
+        console.error('Module import error:', error);
       }
     })();
   </script>
