@@ -11,3 +11,5 @@ The AQUI language was mainly built to create a more customizable interface for t
 Graphice programmatio linguae - maxime pro IdeaLab Fablab creata est et fons omnino aperta! contactus EmreDay1 si vis inscriptio emre.dayangac@hisarschool.k12.tr vel emreday01@gmail.com conferre
 
 Lingua AQUI maxime aedificata erat ut plus customizabilis interfaciendi parametri inceptum crearet. Linguae propositum principale est praebere facultatem utentium edendi profundiorem, quaerens discere parametricum designationem cum Parametrix, lingua omnino scripta in JavaScript et lingua graphica est ad consilia parametrix creandi. AQUI lingua interpretata est.
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
