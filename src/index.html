@@ -4,20 +4,29 @@
   <meta charset="utf-8">
   <title>AQUI Visual Test Environment</title>
   <style>
-    body {
+    * {
       margin: 0;
       padding: 0;
-      font-family: monospace;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    body {
       display: flex;
       flex-direction: column;
-      height: 100vh;
+      font-family: monospace;
       background: #fff;
     }
     
     .header {
+      height: 48px;
       display: flex;
       align-items: center;
-      padding: 10px;
+      padding: 0 16px;
       border-bottom: 1px solid #ccc;
       background: #f8f8f8;
     }
@@ -25,46 +34,51 @@
     .logo {
       font-weight: bold;
       font-size: 18px;
-      margin-right: 20px;
     }
 
     .main-content {
-      display: flex;
       flex: 1;
-      height: calc(100vh - 90px);
+      display: flex;
+      min-height: 0; /* Important for preventing flex overflow */
     }
 
     .editor-panel {
       width: 50%;
-      border-right: 1px solid #ccc;
       display: flex;
       flex-direction: column;
+      border-right: 1px solid #ccc;
     }
 
     .code-editor {
       flex: 1;
-      padding: 10px;
+      width: 100%;
+      padding: 16px;
       font-family: monospace;
       font-size: 14px;
       border: none;
       resize: none;
       background: #fdf6e3;
+      outline: none;
     }
 
     .visualization-panel {
       width: 50%;
-      padding: 20px;
-      background: #fff;
+      position: relative;
     }
 
-    .canvas-container {
-      border: 1px dashed #000;
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
       height: 100%;
     }
 
     .footer {
+      height: 48px;
       display: flex;
-      padding: 10px;
+      align-items: center;
+      padding: 0 16px;
       border-top: 1px solid #ccc;
       background: #f8f8f8;
     }
@@ -83,36 +97,54 @@
     }
 
     .ast-panel {
-      position: fixed;
-      bottom: 40px;
+      position: absolute;
+      bottom: 48px;
       left: 0;
       right: 0;
       height: 200px;
       background: white;
       border-top: 1px solid #ccc;
-      padding: 10px;
+      padding: 16px;
       display: none;
+      font-family: monospace;
+      font-size: 12px;
       overflow: auto;
     }
 
     .ast-panel.visible {
       display: block;
     }
+
+    /* Hide scrollbar but keep functionality */
+    .ast-panel::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .ast-panel::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    .ast-panel::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+
+    .ast-panel::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo">Domine, non nisi Te</div>
+    <div class="logo">Gram</div>
   </div>
 
   <div class="main-content">
     <div class="editor-panel">
-      <textarea class="code-editor" id="code-editor">// AQUI</textarea>
+      <textarea class="code-editor" id="code-editor">//Aqui</textarea>
     </div>
     <div class="visualization-panel">
-      <div class="canvas-container">
-        <canvas id="canvas" width="800" height="600"></canvas>
-      </div>
+      <canvas id="canvas"></canvas>
     </div>
   </div>
 
@@ -193,6 +225,12 @@
 
         // Initial run
         runCode();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+          renderer.setupCanvas();
+          runCode();
+        });
       } catch (error) {
         console.error('Module import error:', error);
       }
