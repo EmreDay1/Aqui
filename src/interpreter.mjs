@@ -19,18 +19,68 @@ export class Interpreter {
     };
   }
 
-  evaluateNode(node) {
-    switch (node.type) {
-      case 'param':        return this.evaluateParam(node);
-      case 'shape':        return this.evaluateShape(node);
-      case 'layer':        return this.evaluateLayer(node);
-      case 'transform':    return this.evaluateTransform(node);
-      case 'if_statement': return this.evaluateIfStatement(node);
-      default:
-        throw new Error(`Unknown node type: ${node.type}`);
-    }
+ // Add to Interpreter class
+evaluateNode(node) {
+  // If we're in a loop and this is a shape node, add the loop counter to the name
+  if (node.type === 'shape' && this.currentLoopCounter !== undefined) {
+    node = {
+      ...node,
+      name: `${node.name}_${this.currentLoopCounter}`
+    };
   }
 
+  switch (node.type) {
+    case 'param':
+      return this.evaluateParam(node);
+    
+    case 'shape':
+      return this.evaluateShape(node);
+    
+    case 'layer':
+      return this.evaluateLayer(node);
+    
+    case 'transform':
+      return this.evaluateTransform(node);
+    
+    case 'if_statement':
+      return this.evaluateIfStatement(node);
+    
+    case 'for_loop':
+      return this.evaluateForLoop(node);
+    
+    default:
+      throw new Error(`Unknown node type: ${node.type}`);
+  }
+}
+
+evaluateForLoop(node) {
+  const start = this.evaluateExpression(node.start);
+  const end = this.evaluateExpression(node.end);
+  const step = this.evaluateExpression(node.step);
+  
+  // Save current loop state if we're in nested loops
+  const outerLoopCounter = this.currentLoopCounter;
+  
+  // Execute the loop
+  for (let i = start; i <= end; i += step) {
+    // Set the iterator value in the environment
+    this.env.setParameter(node.iterator, i);
+    
+    // Update the current loop counter
+    this.currentLoopCounter = i;
+    
+    // Execute each statement in the loop body
+    for (const statement of node.body) {
+      this.evaluateNode(statement);
+    }
+  }
+  
+  // Restore previous loop state
+  this.currentLoopCounter = outerLoopCounter;
+  
+  // Clean up the iterator
+  this.env.parameters.delete(node.iterator);
+}
   evaluateIfStatement(node) {
     const condition = this.evaluateExpression(node.condition);
     if (this.isTruthy(condition)) {
