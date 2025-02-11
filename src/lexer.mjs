@@ -91,7 +91,12 @@ export class Lexer {
       'false': 'FALSE',
       'and': 'AND',
       'or': 'OR',
-      'not': 'NOT'
+      'not': 'NOT',
+      'for': 'FOR',
+      'from': 'FROM',
+      'to': 'TO',
+      'step': 'STEP',
+      'in': 'IN'
     };
     
     const type = keywords[result.toLowerCase()] || 'IDENTIFIER';
