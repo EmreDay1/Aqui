@@ -208,14 +208,19 @@ export class Parser {
   parseArray() {
     this.eat('LBRACKET');
     const elements = [];
+    
     while (this.currentToken.type !== 'RBRACKET') {
       elements.push(this.parseExpression());
-
+      
+      // If it's not the last element, expect a comma
+      if (this.currentToken.type !== 'RBRACKET') {
+        this.eat('COMMA');
+      }
     }
+    
     this.eat('RBRACKET');
     return { type: 'array', elements };
   }
-
   parseParam() {
     this.eat('PARAM');
     const name = this.currentToken.value;
@@ -325,8 +330,6 @@ export class Parser {
         break;
       case 'FOR':
         statement = this.parseForLoop();
-      case 'UNION':
-          statement = this.parseUnion();
         break;
       case 'ADD':
         this.eat('ADD');
