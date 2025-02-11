@@ -96,6 +96,7 @@ export class Lexer {
       'from': 'FROM',
       'to': 'TO',
       'step': 'STEP',
+      'union': 'UNION',
       'in': 'IN'
     };
     
