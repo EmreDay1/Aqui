@@ -325,6 +325,8 @@ export class Parser {
         break;
       case 'FOR':
         statement = this.parseForLoop();
+      case 'UNION':
+          statement = this.parseUnion();
         break;
       case 'ADD':
         this.eat('ADD');
@@ -377,6 +379,33 @@ export class Parser {
       end,
       step,
       body
+    };
+  }
+
+  parseUnion() {
+    this.eat('UNION');
+    const name = this.currentToken.value;
+    this.eat('IDENTIFIER');
+    
+    this.eat('LBRACE');
+    const shapes = [];
+    
+    while (this.currentToken.type !== 'RBRACE') {
+      if (this.currentToken.type === 'ADD') {
+        this.eat('ADD');
+        shapes.push(this.currentToken.value);
+        this.eat('IDENTIFIER');
+      } else {
+        this.error('Expected ADD command in union block');
+      }
+    }
+    
+    this.eat('RBRACE');
+    
+    return {
+      type: 'union',
+      name,
+      shapes
     };
   }
 
