@@ -117,31 +117,47 @@ evaluateForLoop(node) {
     return this.env.createShape(node.shapeType, node.name, params);
   }
 
+  shapeToPath(shape) {
+    // Convert any shape to a path using ShapePoints
+    const points = ShapePoints.getPoints(shape);
+    return {
+      type: 'path',
+      params: {
+        points,
+        closed: true
+      },
+      transform: {
+        position: [0, 0],
+        rotation: 0,
+        scale: [1, 1]
+      }
+    };
+  }
+
+  
+
   evaluateLayer(node) {
-    const layer = this.env.createLayer(node.name);
     for (const cmd of node.commands) {
       switch (cmd.type) {
         case 'add': {
           const shape = this.env.getShape(cmd.shape);
-          layer.shapes.set(cmd.shape, shape);
-          break;
-        }
-        case 'subtract': {
-          layer.operations.push({ type: 'subtract', shape: this.env.getShape(cmd.shape) });
+          if (!shape) {
+            throw new Error(`Shape not found for layer: ${cmd.shape}`);
+          }
           break;
         }
         case 'rotate': {
+          // Rotate all previously added shapes in this layer
           const angle = this.evaluateExpression(cmd.angle);
-          layer.operations.push({ type: 'rotate', angle });
-          layer.transform.rotation += angle;
+          for (const [name, shape] of this.env.shapes) {
+            shape.transform.rotation = (shape.transform.rotation || 0) + angle;
+          }
           break;
         }
-        default:
-          throw new Error(`Unknown layer command: ${cmd.type}`);
       }
     }
-    return layer;
   }
+  
 
   evaluateTransform(node) {
     const target = this.env.shapes.get(node.target) || this.env.layers.get(node.target);
