@@ -75,6 +75,90 @@ if param.size > 50 {
 - If `size` is greater than 50, `bigCircle` is created.
 - Otherwise, `smallCircle` is created.
 
+## Loops
+
+### **1. Basic Range Loop**
+Iterates from a start value to an end value with an optional step.
+#### **Syntax:**
+```aqui
+for iterator from start to end {
+    // shape definitions and transformations
+}
+```
+#### **Example:**
+```aqui
+for i from 0 to 5 {
+    shape circle circle1 {
+        radius: 10
+        position: [i * 30, 50]
+    }
+}
+```
+- Creates circles named `circle1_0` through `circle1_5`
+- Iterator `i` can be used in expressions
+- Shape names are automatically indexed
+
+### **2. Step Loop**
+Includes a step value to control iteration increment.
+#### **Syntax:**
+```aqui
+for iterator from start to end step stepValue {
+    // shape definitions and transformations
+}
+```
+#### **Example:**
+```aqui
+for i from 0 to 100 step 20 {
+    shape circle circle1 {
+        radius: i / 4
+        position: [i, 50]
+    }
+}
+```
+- Creates circles with increasing radii
+- Steps by 20 units each iteration
+- Automatic naming applies as `circle1_0`, `circle1_20`, etc.
+
+### **3. Shape Naming**
+Loops automatically handle unique shape naming.
+#### **Behavior:**
+- Base shape name is suffixed with underscore and iteration number
+- Format: `shapeName_iterationNumber`
+- Enables referencing specific instances after loop execution
+
+#### **Example with Transforms:**
+```aqui
+for i from 0 to 5 {
+    shape circle circle1 {
+        radius: 10
+        position: [i * 30, 50]
+    }
+}
+
+transform circle1_2 {
+    rotate: 45
+}
+```
+- Creates multiple circles
+- Individual shapes can be referenced using generated names
+- Transforms can target specific instances
+
+### **4. Using Loop Iterator**
+The iterator variable can be used in various expressions.
+#### **Examples:**
+```aqui
+for i from 0 to 3 {
+    shape rectangle rect1 {
+        width: i * 10
+        height: 50
+        position: [i * 40, i * 20]
+    }
+}
+```
+- Iterator can define dimensions
+- Iterator can define positions
+- Iterator available in all expressions within loop body
+
 ## Shape Classes
 Aqui supports 20 predefined shape classes:
 
