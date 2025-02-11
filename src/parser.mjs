@@ -323,6 +323,9 @@ export class Parser {
       case 'TRANSFORM':
         statement = this.parseTransform();
         break;
+      case 'FOR':
+        statement = this.parseForLoop();
+        break;
       case 'ADD':
         this.eat('ADD');
         statement = { 
@@ -343,6 +346,38 @@ export class Parser {
         this.error(`Unexpected token: ${this.currentToken.type}`);
     }
     return statement;
+  }
+
+  parseForLoop() {
+    this.eat('FOR');
+    const iterator = this.currentToken.value;
+    this.eat('IDENTIFIER');
+    this.eat('FROM');
+    const start = this.parseExpression();
+    this.eat('TO');
+    const end = this.parseExpression();
+    
+    let step = { type: 'number', value: 1 };  // Default step
+    if (this.currentToken.type === 'STEP') {
+      this.eat('STEP');
+      step = this.parseExpression();
+    }
+    
+    this.eat('LBRACE');
+    const body = [];
+    while (this.currentToken.type !== 'RBRACE' && this.currentToken.type !== 'EOF') {
+      body.push(this.parseStatement());
+    }
+    this.eat('RBRACE');
+    
+    return {
+      type: 'for_loop',
+      iterator,
+      start,
+      end,
+      step,
+      body
+    };
   }
 
   parse() {
