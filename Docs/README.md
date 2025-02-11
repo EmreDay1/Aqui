@@ -24,7 +24,7 @@ Shapes define geometric elements with configurable properties.
 ```aqui
 shape circle myCircle {
     radius: 30
-    position: [50 50]
+    position: [50, 50]
 }
 ```
 - `shape` is the keyword.
@@ -63,12 +63,12 @@ Aqui supports conditional statements to dynamically create shapes.
 if param.size > 50 {
     shape circle bigCircle {
         radius: param.size
-        position: [100 100]
+        position: [100, 100]
     }
 } else {
     shape circle smallCircle {
         radius: param.size / 2
-        position: [100 100]
+        position: [100, 100]
     }
 }
 ```
@@ -167,7 +167,7 @@ Aqui supports 20 predefined shape classes:
 shape rectangle myRect {
     width: 100
     height: 50
-    position: [50 50]
+    position: [50, 50]
 }
 ```
 - Defines a rectangle with width, height, and position.
@@ -176,7 +176,7 @@ shape rectangle myRect {
 ```aqui
 shape circle myCircle {
     radius: 30
-    position: [50 50]
+    position: [50, 50]
 }
 ```
 - Defines a circle with a radius and position.
@@ -186,7 +186,7 @@ shape circle myCircle {
 shape triangle myTriangle {
     base: 60
     height: 80
-    position: [50 50]
+    position: [50, 50]
 }
 ```
 - Defines a triangle with a base and height.
@@ -196,7 +196,7 @@ shape triangle myTriangle {
 shape ellipse myEllipse {
     radiusX: 40
     radiusY: 20
-    position: [50 50]
+    position: [50, 50]
 }
 ```
 - Defines an ellipse with different X and Y radii.
@@ -206,7 +206,7 @@ shape ellipse myEllipse {
 shape polygon myPolygon {
     radius: 50
     sides: 6
-    position: [50 50]
+    position: [50, 50]
 }
 ```
 - Defines a regular polygon with a specific number of sides.
@@ -217,7 +217,7 @@ shape star myStar {
     outerRadius: 50
     innerRadius: 20
     points: 5
-    position: [50 50]
+    position: [50, 50]
 }
 ```
 - Defines a star with outer and inner radii and number of points.
@@ -228,7 +228,7 @@ shape arc myArc {
     radius: 50
     startAngle: 0
     endAngle: 180
-    position: [50 50]
+    position: [50, 50]
 }
 ```
 - Defines an arc with a radius and start/end angles.
@@ -239,7 +239,7 @@ shape roundedRectangle myRoundRect {
     width: 100
     height: 50
     radius: 10
-    position: [50 50]
+    position: [50, 50]
 }
 ```
 - Defines a rectangle with rounded corners.
@@ -248,9 +248,9 @@ shape roundedRectangle myRoundRect {
 ```aqui
 shape path myPath {
     points: [
-        [0 0],
-        [50 50],
-        [100 0]
+        [0, 0],
+        [50, 50],
+        [100, 0]
     ]
 }
 ```
@@ -262,7 +262,7 @@ shape arrow myArrow {
     length: 100
     headWidth: 20
     headLength: 30
-    position: [50 50]
+    position: [50, 50]
 }
 ```
 - Defines an arrow shape.
@@ -272,7 +272,7 @@ shape arrow myArrow {
 shape text myText {
     text: "Hello Aqui"
     fontSize: 20
-    position: [50 50]
+    position: [50, 50]
 }
 ```
 - Defines a text shape.
@@ -280,10 +280,10 @@ shape text myText {
 ### **12. Bezier Curve**
 ```aqui
 shape bezier myBezier {
-    startPoint: [0 0]
-    controlPoint1: [50 100]
-    controlPoint2: [100 100]
-    endPoint: [150 0]
+    startPoint: [0, 0]
+    controlPoint1: [50, 100]
+    controlPoint2: [100, 100]
+    endPoint: [150, 0]
 }
 ```
 - Defines a cubic Bezier curve.
@@ -293,7 +293,7 @@ shape bezier myBezier {
 shape donut myDonut {
     outerRadius: 50
     innerRadius: 20
-    position: [50 50]
+    position: [50, 50]
 }
 ```
 - Defines a donut shape.
@@ -359,8 +359,8 @@ shape chamferRectangle myChamfer {
 ### **20. Polygon with Holes**
 ```aqui
 shape polygonWithHoles myPoly {
-    outerPoints: [[0 0], [100 0], [100 100], [0 100]]
-    holes: [[[30 30], [70 30], [70 70], [30 70]]]
+    outerPoints: [[0, 0], [100, 0], [100, 100], [0, 100]]
+    holes: [[[30, 30], [70, 30], [70, 70], [30, 70]]]
 }
 ```
 - Defines a polygon with internal holes.
