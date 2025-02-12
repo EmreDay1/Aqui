@@ -137,28 +137,37 @@ evaluateForLoop(node) {
   
 
   evaluateLayer(node) {
+    const layer = {
+      name: node.name,
+      shapes: new Set(),  // Use Set to store shape names
+      transform: {
+          position: [0, 0],
+          rotation: 0,
+          scale: [1, 1]
+      }
+  };
     for (const cmd of node.commands) {
       switch (cmd.type) {
         case 'add': {
-          const shape = this.env.getShape(cmd.shape);
-          if (!shape) {
-            throw new Error(`Shape not found for layer: ${cmd.shape}`);
-          }
-          break;
+            // Just store the shape name in the layer
+            layer.shapes.add(cmd.shape);
+            break;
         }
         case 'rotate': {
-          // Rotate all previously added shapes in this layer
-          const angle = this.evaluateExpression(cmd.angle);
-          for (const [name, shape] of this.env.shapes) {
-            shape.transform.rotation = (shape.transform.rotation || 0) + angle;
-          }
-          break;
+            const angle = this.evaluateExpression(cmd.angle);
+            // Directly modify shapes in this layer
+            for (const shapeName of layer.shapes) {
+                const shape = this.env.getShape(shapeName);
+                if (shape) {
+                    shape.transform.rotation = (shape.transform.rotation || 0) + angle;
+                }
+            }
+            break;
         }
       }
     }
+    return layer;
   }
-  
-
   evaluateTransform(node) {
     const target = this.env.shapes.get(node.target) || this.env.layers.get(node.target);
     if (!target) {
