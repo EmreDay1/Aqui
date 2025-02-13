@@ -1,5 +1,5 @@
 # Aqui
-Graphical programming language- mainly created for IdeaLab Fablab and completely **OPEN SOURCE!** contact EmreDay1 if you want to contribute, email emre.dayangac@hisarschool.k12.tr or emreday01@gmail.com
+Graphical programming language- mainly created for IdeaLab Fablab and completely **OPEN SOURCE!** contact EmreDay1 if you want to contribute, email emre.dayangac@hisarschool.k12.tr or emreday01@gmail.com and if you want to contact the organization you may contact hisarcs@hisarschool.k12.tr
 
 <img width="980" alt="Screenshot 2025-02-01 at 17 21 51" src="https://github.com/user-attachments/assets/d6f9d09d-f454-4a42-8cbe-7930f766edb1" />
 
