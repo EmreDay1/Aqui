@@ -35,7 +35,7 @@ export class Environment {
               rotation: 0,
               scale: [1, 1]
           },
-          layerName: null  // Track which layer this shape belongs to
+          layerName: null  
       };
       this.shapes.set(name, shape);
       return shape;
@@ -51,7 +51,7 @@ export class Environment {
   createLayer(name) {
       const layer = {
           name,
-          addedShapes: new Set(),  // Track only explicitly added shapes
+          addedShapes: new Set(),  
           operations: [],
           transform: {
               position: [0, 0],
@@ -64,7 +64,7 @@ export class Environment {
       return layer;
   }
 
-  // New method to add shape to layer
+
   addShapeToLayer(layerName, shapeName) {
       const layer = this.layers.get(layerName);
       if (!layer) {
@@ -77,18 +77,17 @@ export class Environment {
       }
   }
 
-  // Method to check if shape is in layer
+ 
   isShapeInLayer(shapeName, layerName) {
       const layer = this.layers.get(layerName);
       return layer && layer.addedShapes.has(shapeName);
   }
 
-  // Modified to only transform shapes explicitly added to layer
   transformShape(name, transform) {
       const shape = this.getShape(name);
       if (!shape) return;
 
-      // Only apply layer transform if shape was explicitly added to layer
+
       if (shape.layerName && this.isShapeInLayer(name, shape.layerName)) {
           const layer = this.layers.get(shape.layerName);
           shape.transform = {
