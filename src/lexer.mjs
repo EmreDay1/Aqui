@@ -97,6 +97,8 @@ export class Lexer {
       'to': 'TO',
       'step': 'STEP',
       'union': 'UNION',
+      'difference': 'DIFFERENCE',
+      'intersection': 'INTERSECTION',
       'in': 'IN'
     };
     
