@@ -281,6 +281,47 @@ export class Parser {
     return { type: 'layer', name, commands };
   }
 
+  parseBooleanOperation() {
+    // Store the operation type (union/difference/intersection)
+    const operation = this.currentToken.type.toLowerCase();
+    this.eat(this.currentToken.type);
+
+    // Get the name for the resulting shape
+    const name = this.currentToken.value;
+    this.eat('IDENTIFIER');
+
+    // Parse the block
+    this.eat('LBRACE');
+    const shapes = [];
+
+    // Parse each "add shape" command
+    while (this.currentToken.type !== 'RBRACE') {
+        if (this.currentToken.type === 'ADD') {
+            this.eat('ADD');
+            const shapeName = this.currentToken.value;
+            this.eat('IDENTIFIER');
+            shapes.push(shapeName);
+        } else {
+            this.error('Expected ADD command in boolean operation block');
+        }
+    }
+
+    this.eat('RBRACE');
+
+    // Validate we have at least 2 shapes
+    if (shapes.length < 2) {
+        this.error('Boolean operation requires at least two shapes');
+    }
+
+    return {
+        type: 'boolean_operation',
+        operation: operation,
+        name: name,
+        shapes: shapes
+    };
+}
+
+
   parseTransform() {
     this.eat('TRANSFORM');
     const target = this.currentToken.value;
@@ -347,6 +388,11 @@ export class Parser {
           angle: this.parseExpression()
         };
         break;
+        case 'UNION':
+        case 'DIFFERENCE':
+        case 'INTERSECTION':
+              statement = this.parseBooleanOperation();
+              break;
       default:
         this.error(`Unexpected token: ${this.currentToken.type}`);
     }
