@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Aqui 3D</title>
+
+    <!-- CodeMirror Dependencies -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/mode/simple.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/comment/comment.min.js"></script>
+
+    <!-- Three.js -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.159.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            font-family: monospace;
+            background: #fff;
+        }
+
+        .header {
+            height: 48px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            border-bottom: 1px solid #ccc;
+            background: #f8f8f8;
+        }
+
+        .logo {
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            min-height: 0;
+        }
+
+        .editor-panel {
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #ccc;
+        }
+
+        .visualization-panel {
+            width: 50%;
+            position: relative;
+        }
+
+        #scene-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .CodeMirror {
+            height: 100%;
+            font-size: 14px;
+            background: #fdf6e3;
+        }
+
+        .footer {
+            height: 48px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            border-top: 1px solid #ccc;
+            background: #f8f8f8;
+        }
+
+        .button {
+            padding: 8px 16px;
+            margin-right: 10px;
+            font-family: monospace;
+            border: none;
+            background: #e0e0e0;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background: #d0d0d0;
+        }
+
+        .panel {
+            position: absolute;
+            bottom: 48px;
+            left: 0;
+            right: 0;
+            height: 200px;
+            background: white;
+            border-top: 1px solid #ccc;
+            padding: 16px;
+            display: none;
+            font-family: monospace;
+            font-size: 12px;
+            overflow: auto;
+        }
+
+        .panel.visible {
+            display: block;
+        }
+
+        .error-count {
+            background: #d32f2f;
+            color: white;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 11px;
+            margin-left: 6px;
+            display: none;
+        }
+
+        .error-count.visible {
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Aqui 3D</div>
+    </div>
+
+    <div class="main-content">
+        <div class="editor-panel">
+            <textarea id="code-editor"></textarea>
+        </div>
+        <div class="visualization-panel">
+            <div id="scene-container"></div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <button class="button" id="run-button">Run (Shift + Enter)</button>
+        <button class="button" id="view-ast">View AST</button>
+        <button class="button" id="export-svg">Export</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // Initialize CodeMirror
+        CodeMirror.defineSimpleMode("aqui3d", {
+            start: [
+                { regex: /\/\/.*/, token: "comment" },
+                { regex: /\b(shape|cube|sphere|cylinder|rotate|scale|position|x|y|z|width|height|depth)\b/, token: "keyword" },
+                { regex: /\b\d+(\.\d+)?\b/, token: "number" },
+                { regex: /[\{\}\[\]:,]/, token: "operator" }
+            ]
+        });
+
+        const editor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+            mode: "aqui3d",
+            theme: "default",
+            lineNumbers: true,
+            autoCloseBrackets: true,
+            matchBrackets: true
+        });
+
+        class Scene3D {
+            constructor(container) {
+                this.container = container;
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0xffffff);
+                this.setupCamera();
+                this.setupRenderer();
+                this.setupLights();
+                this.setupControls();
+                this.setupHelpers();
+                this.animate();
+
+                window.addEventListener('resize', () => this.onWindowResize());
+            }
+
+            setupCamera() {
+                this.camera = new THREE.PerspectiveCamera(
+                    75,
+                    this.container.clientWidth / this.container.clientHeight,
+                    0.1,
+                    1000
+                );
+                this.camera.position.set(5, 5, 5);
+                this.camera.lookAt(0, 0, 0);
+            }
+
+            setupRenderer() {
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+                this.container.appendChild(this.renderer.domElement);
+            }
+
+            setupLights() {
+                const ambientLight = new THREE.AmbientLight(0x404040);
+                this.scene.add(ambientLight);
+
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+                directionalLight.position.set(10, 10, 10);
+                this.scene.add(directionalLight);
+            }
+
+            setupControls() {
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+            }
+
+            setupHelpers() {
+                const gridHelper = new THREE.GridHelper(10, 10, 0xcccccc, 0xcccccc);
+                this.scene.add(gridHelper);
+
+                const axesHelper = new THREE.AxesHelper(5);
+                this.scene.add(axesHelper);
+            }
+
+            onWindowResize() {
+                this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.controls.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+
+            clearScene() {
+                while(this.scene.children.length > 0){ 
+                    this.scene.remove(this.scene.children[0]); 
+                }
+                this.setupLights();
+                this.setupHelpers();
+            }
+
+            addShape(mesh) {
+                this.scene.add(mesh);
+            }
+        }
+
+        // Initialize the scene
+        const container = document.getElementById('scene-container');
+        const scene3D = new Scene3D(container);
+
+        // Run button functionality
+        document.getElementById('run-button').addEventListener('click', () => {
+            const code = editor.getValue();
+            try {
+                // Here you would parse and execute the code
+                // For now, let's just add a cube as an example
+                scene3D.clearScene();
+                const geometry = new THREE.BoxGeometry(1, 1, 1);
+                const material = new THREE.MeshStandardMaterial({ 
+                    color: 0x00ff9d,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const cube = new THREE.Mesh(geometry, material);
+                cube.rotation.x = Math.PI / 4;
+                cube.rotation.y = Math.PI / 4;
+                scene3D.addShape(cube);
+            } catch (error) {
+                console.error('Error executing code:', error);
+            }
+        });
+
+        // Handle Shift+Enter
+        editor.on("keydown", (cm, event) => {
+            if (event.shiftKey && event.key === "Enter") {
+                event.preventDefault();
+                document.getElementById('run-button').click();
+            }
+        });
+    </script>
+</body>
+</html>
