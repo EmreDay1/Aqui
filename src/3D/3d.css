@@ -1,0 +1,144 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-light: #f5ebd3;
+    --bg-header: #f8f8f8;
+    --border-color: #ccc;
+    --text-color: #333;
+    --button-bg: #e0e0e0;
+    --button-hover: #d0d0d0;
+    --error-bg: #ffebee;
+    --error-hover: #ffcdd2;
+}
+
+html, body {
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Arial', sans-serif;
+    color: var(--text-color);
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.header {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-header);
+}
+
+.logo {
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.main-content {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+.editor-panel {
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-color);
+}
+
+.CodeMirror {
+    height: 100%;
+    font-size: 14px;
+    background: var(--bg-light);
+}
+
+.visualization-panel {
+    width: 50%;
+    position: relative;
+}
+
+#canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.footer {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-header);
+}
+
+.button {
+    padding: 8px 16px;
+    margin-right: 10px;
+    font-family: monospace;
+    border: none;
+    background: var(--button-bg);
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.button:hover {
+    background: var(--button-hover);
+}
+
+.button.error {
+    background: var(--error-bg);
+}
+
+.button.error:hover {
+    background: var(--error-hover);
+}
+
+.panels {
+    position: relative;
+}
+
+.panel {
+    position: absolute;
+    bottom: 48px;
+    left: 0;
+    right: 0;
+    height: 200px;
+    background: white;
+    border-top: 1px solid var(--border-color);
+    padding: 16px;
+    display: none;
+    font-family: monospace;
+    font-size: 12px;
+    overflow: auto;
+    z-index: 10;
+}
+
+.panel.visible {
+    display: block;
+}
+
+.error-count {
+    background: #d32f2f;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 11px;
+    margin-left: 6px;
+    display: none;
+}
+
+.error-count.visible {
+    display: inline-block;
+}
