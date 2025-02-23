@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Aqui 3D</title>
+    
+    <!-- CodeMirror Dependencies -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/mode/simple.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/comment/comment.min.js"></script>
+
+    <!-- Three.js -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.159.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <link rel="stylesheet" href="3d.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Aqui 3D.)</div>
+        </div>
+
+        <div class="main-content">
+            <div class="editor-panel">
+                <textarea id="code-editor">//Aqui 3D</textarea>
+            </div>
+            <div class="visualization-panel">
+                <canvas id="canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="panels">
+            <div class="panel" id="ast-panel">
+                <pre id="ast-output"></pre>
+            </div>
+
+            <div class="panel" id="error-panel">
+                <pre id="error-output"></pre>
+            </div>
+        </div>
+
+        <div class="footer">
+            <button class="button" id="run-button">Run (Shift + Enter)</button>
+            <button class="button" id="view-ast">View AST</button>
+            <button class="button error" id="view-errors">
+                Errors
+                <span class="error-count" id="error-count">0</span>
+            </button>
+            <button class="button" id="export-gltf">Export GLTF</button>
+        </div>
+    </div>
+
+    <script type="module" src="3D.js"></script>
+</body>
+</html>
