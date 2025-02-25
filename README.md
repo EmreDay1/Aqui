@@ -13,3 +13,4 @@ Graphice programmatio linguae - maxime pro IdeaLab Fablab creata est et fons omn
 Lingua AQUI maxime aedificata erat ut plus customizabilis interfaciendi parametri inceptum crearet. Linguae propositum principale est praebere facultatem utentium edendi profundiorem, quaerens discere parametricum designationem cum Parametrix, lingua omnino scripta in JavaScript et lingua graphica est ad consilia parametrix creandi. AQUI lingua interpretata est. Si vis discere quomodo uti hic sit nexus documentorum: https://github.com/EmreDay1/Aqui/tree/main/Docs
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+<img width="1680" alt="Screenshot 2025-02-25 at 16 57 38" src="https://github.com/user-attachments/assets/5e744c9b-b202-4835-9ea5-139373010788" />
