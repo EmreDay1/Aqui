@@ -32,7 +32,49 @@
 
         <div class="main-content">
             <div class="editor-panel">
-                <textarea id="code-editor">//Aqui 3D</textarea>
+                <textarea id="code-editor">//Aqui 3D
+// Basic example with multiple shapes
+param size 1.5
+param segments 12
+
+// Create a cube
+shape cube myCube {
+    width: param.size
+    height: param.size
+    depth: param.size
+    segments: param.segments
+    position: [0, 0, 0]
+    color: "#00ff9d"
+}
+
+// Create a sphere
+shape sphere mySphere {
+    radius: param.size / 2
+    position: [3, 0, 0]
+    color: "#ff5722"
+}
+
+// Create a cylinder
+shape cylinder myCylinder {
+    radiusTop: 0.7
+    radiusBottom: 0.7
+    height: 2
+    position: [-3, 0, 0]
+    color: "#4285f4"
+}
+
+// Apply rotation to cube
+transform myCube {
+    rotate: [45, 45, 0]
+}
+
+// Create a layer for movement
+layer moveGroup {
+    add mySphere
+    add myCylinder
+    position: [0, 2, 0]
+    rotate: [0, 45, 0]
+}</textarea>
             </div>
             <div class="visualization-panel">
                 <canvas id="canvas"></canvas>
@@ -60,6 +102,1240 @@
         </div>
     </div>
 
-    <script type="module" src="3D.js"></script>
+    <!-- Self-contained implementation of Aqui with Three.js -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+        // =========================================================
+        // Aqui Language Implementation
+        // =========================================================
+
+        // Token Class
+        class Token {
+            constructor(type, value, line, column) {
+                this.type = type;
+                this.value = value;
+                this.line = line;
+                this.column = column;
+            }
+        }
+
+        // Lexer Class
+        class Lexer {
+            constructor(input) {
+                this.input = input;
+                this.position = 0;
+                this.line = 1;
+                this.column = 1;
+                this.currentChar = this.input[0] || null;
+            }
+
+            error(message) {
+                throw new Error(`Lexer error at line ${this.line}, col ${this.column}: ${message}`);
+            }
+
+            advance() {
+                this.position++;
+                if (this.position >= this.input.length) {
+                    this.currentChar = null;
+                } else {
+                    this.currentChar = this.input[this.position];
+                    this.column++;
+                }
+            }
+
+            skipComment() {
+                this.advance();
+                this.advance();
+                while (this.currentChar !== null && this.currentChar !== '\n') {
+                    this.advance();
+                }
+            }
+
+            skipWhitespace() {
+                while (this.currentChar && /\s/.test(this.currentChar)) {
+                    if (this.currentChar === '\n') {
+                        this.line++;
+                        this.column = 1;
+                    }
+                    this.advance();
+                }
+            }
+
+            number() {
+                let result = '';
+                while (this.currentChar && /\d/.test(this.currentChar)) {
+                    result += this.currentChar;
+                    this.advance();
+                }
+                if (this.currentChar === '.') {
+                    result += '.';
+                    this.advance();
+                    while (this.currentChar && /\d/.test(this.currentChar)) {
+                        result += this.currentChar;
+                        this.advance();
+                    }
+                }
+                return new Token('NUMBER', parseFloat(result), this.line, this.column);
+            }
+
+            identifier() {
+                let result = '';
+                while (this.currentChar && /[a-zA-Z0-9_.]/.test(this.currentChar)) {
+                    result += this.currentChar;
+                    this.advance();
+                }
+                
+                const keywords = {
+                    'param': 'PARAM',
+                    'shape': 'SHAPE',
+                    'layer': 'LAYER',
+                    'transform': 'TRANSFORM',
+                    'add': 'ADD',
+                    'subtract': 'SUBTRACT',
+                    'rotate': 'ROTATE',
+                    'scale': 'SCALE',
+                    'position': 'POSITION',
+                    'color': 'COLOR',
+                    'if': 'IF',
+                    'else': 'ELSE',
+                    'endif': 'ENDIF',
+                    'true': 'TRUE',
+                    'false': 'FALSE',
+                    'and': 'AND',
+                    'or': 'OR',
+                    'not': 'NOT',
+                    'for': 'FOR',
+                    'from': 'FROM',
+                    'to': 'TO',
+                    'step': 'STEP',
+                    'union': 'UNION',
+                    'difference': 'DIFFERENCE',
+                    'intersection': 'INTERSECTION',
+                    'in': 'IN',
+                    'cube': 'CUBE',
+                    'sphere': 'SPHERE',
+                    'cylinder': 'CYLINDER',
+                    'cone': 'CONE',
+                    'torus': 'TORUS',
+                    'plane': 'PLANE'
+                };
+                
+                const type = keywords[result.toLowerCase()] || 'IDENTIFIER';
+                return new Token(type, result, this.line, this.column);
+            }
+
+            string() {
+                let result = '';
+                this.advance(); // Skip opening quote
+                while (this.currentChar && this.currentChar !== '"') {
+                    result += this.currentChar;
+                    this.advance();
+                }
+                if (this.currentChar === '"') {
+                    this.advance(); // Skip closing quote
+                    return new Token('STRING', result, this.line, this.column);
+                }
+                this.error('Unterminated string');
+            }
+
+            getNextToken() {
+                while (this.currentChar !== null) {
+                    if (this.currentChar === '/' && this.input[this.position + 1] === '/') {
+                        this.skipComment();
+                        continue;
+                    }
+                    
+                    if (/\s/.test(this.currentChar)) {
+                        this.skipWhitespace();
+                        continue;
+                    }
+                    
+                    if (/\d/.test(this.currentChar)) {
+                        return this.number();
+                    }
+                    
+                    if (/[a-zA-Z_]/.test(this.currentChar)) {
+                        return this.identifier();
+                    }
+
+                    if (this.currentChar === '"') {
+                        return this.string();
+                    }
+
+                    if (this.currentChar === '#') {
+                        let start = this.position;
+                        let hexColor = '#';
+                        this.advance(); // Skip #
+                        while (/[0-9a-fA-F]/.test(this.currentChar)) {
+                            hexColor += this.currentChar;
+                            this.advance();
+                        }
+                        return new Token('COLOR', hexColor, this.line, this.column);
+                    }
+
+                    // Add comparison operators
+                    if (this.currentChar === '=' && this.input[this.position + 1] === '=') {
+                        this.advance();
+                        this.advance();
+                        return new Token('EQUALS', '==', this.line, this.column - 1);
+                    }
+
+                    if (this.currentChar === '!' && this.input[this.position + 1] === '=') {
+                        this.advance();
+                        this.advance();
+                        return new Token('NOT_EQUALS', '!=', this.line, this.column - 1);
+                    }
+
+                    if (this.currentChar === '<') {
+                        this.advance();
+                        if (this.currentChar === '=') {
+                            this.advance();
+                            return new Token('LESS_EQUALS', '<=', this.line, this.column - 1);
+                        }
+                        return new Token('LESS', '<', this.line, this.column);
+                    }
+
+                    if (this.currentChar === '>') {
+                        this.advance();
+                        if (this.currentChar === '=') {
+                            this.advance();
+                            return new Token('GREATER_EQUALS', '>=', this.line, this.column - 1);
+                        }
+                        return new Token('GREATER', '>', this.line, this.column);
+                    }
+
+                    // Basic operators and symbols
+                    switch (this.currentChar) {
+                        case '{':
+                            this.advance();
+                            return new Token('LBRACE', '{', this.line, this.column);
+                        case '}':
+                            this.advance();
+                            return new Token('RBRACE', '}', this.line, this.column);
+                        case '[':
+                            this.advance();
+                            return new Token('LBRACKET', '[', this.line, this.column);
+                        case ']':
+                            this.advance();
+                            return new Token('RBRACKET', ']', this.line, this.column);
+                        case ':':
+                            this.advance();
+                            return new Token('COLON', ':', this.line, this.column);
+                        case ',':
+                            this.advance();
+                            return new Token('COMMA', ',', this.line, this.column);
+                        case '*':
+                            this.advance();
+                            return new Token('MULTIPLY', '*', this.line, this.column);
+                        case '/':
+                            this.advance();
+                            return new Token('DIVIDE', '/', this.line, this.column);
+                        case '+':
+                            this.advance();
+                            return new Token('PLUS', '+', this.line, this.column);
+                        case '-':
+                            this.advance();
+                            return new Token('MINUS', '-', this.line, this.column);
+                        case '.':
+                            this.advance();
+                            return new Token('DOT', '.', this.line, this.column);
+                        case '(':
+                            this.advance();
+                            return new Token('LPAREN', '(', this.line, this.column);
+                        case ')':
+                            this.advance();
+                            return new Token('RPAREN', ')', this.line, this.column);
+                        default:
+                            this.error(`Unknown character: ${this.currentChar}`);
+                    }
+                }
+                return new Token('EOF', null, this.line, this.column);
+            }
+        }
+
+        // Parser Class
+        class Parser {
+            constructor(lexer) {
+                this.lexer = lexer;
+                this.currentToken = this.lexer.getNextToken();
+            }
+
+            error(message) {
+                throw new Error(`Parser error at line ${this.currentToken.line}, col ${this.currentToken.column}: ${message}`);
+            }
+
+            eat(tokenType) {
+                if (this.currentToken.type === tokenType) {
+                    const token = this.currentToken;
+                    this.currentToken = this.lexer.getNextToken();
+                    return token;
+                } else {
+                    this.error(`Expected ${tokenType} but got ${this.currentToken.type}`);
+                }
+            }
+
+            parseCondition() {
+                let expr = this.parseExpression();
+                return expr;
+            }
+
+            parseExpression() {
+                let node = this.parseTerm();
+                while (this.currentToken.type === 'PLUS' || this.currentToken.type === 'MINUS') {
+                    const operator = this.currentToken.type;
+                    this.eat(operator);
+                    node = {
+                        type: 'binary_op',
+                        operator: operator.toLowerCase(),
+                        left: node,
+                        right: this.parseTerm()
+                    };
+                }
+                return node;
+            }
+
+            parseTerm() {
+                let node = this.parseFactor();
+                while (this.currentToken.type === 'MULTIPLY' || this.currentToken.type === 'DIVIDE') {
+                    const operator = this.currentToken.type;
+                    this.eat(operator);
+                    node = {
+                        type: 'binary_op',
+                        operator: operator.toLowerCase(),
+                        left: node,
+                        right: this.parseFactor()
+                    };
+                }
+                return node;
+            }
+
+            parseFactor() {
+                const token = this.currentToken;
+                
+                if (token.type === 'NUMBER') {
+                    this.eat('NUMBER');
+                    return { type: 'number', value: token.value };
+                } 
+                
+                if (token.type === 'STRING' || token.type === 'COLOR') {
+                    this.eat(token.type);
+                    return { type: 'string', value: token.value };
+                }
+                
+                if (token.type === 'TRUE' || token.type === 'FALSE') {
+                    this.eat(token.type);
+                    return { type: 'boolean', value: token.type === 'TRUE' };
+                }
+                
+                if (token.type === 'IDENTIFIER') {
+                    const name = token.value;
+                    this.eat('IDENTIFIER');
+                    if (this.currentToken.type === 'DOT') {
+                        this.eat('DOT');
+                        const prop = this.currentToken.value;
+                        this.eat('IDENTIFIER');
+                        return { type: 'identifier', name: `${name}.${prop}` };
+                    }
+                    return { type: 'identifier', name };
+                }
+                
+                if (token.type === 'MINUS') {
+                    this.eat('MINUS');
+                    return { type: 'unary_op', operator: 'minus', operand: this.parseFactor() };
+                }
+                
+                if (token.type === 'LBRACKET') {
+                    return this.parseArray();
+                }
+                
+                if (token.type === 'LPAREN') {
+                    this.eat('LPAREN');
+                    const expr = this.parseCondition();
+                    this.eat('RPAREN');
+                    return expr;
+                }
+                
+                this.error(`Unexpected token in factor: ${token.type}`);
+            }
+
+            parseArray() {
+                this.eat('LBRACKET');
+                const elements = [];
+                
+                while (this.currentToken.type !== 'RBRACKET') {
+                    elements.push(this.parseExpression());
+                    
+                    // If it's not the last element, expect a comma
+                    if (this.currentToken.type !== 'RBRACKET') {
+                        this.eat('COMMA');
+                    }
+                }
+                
+                this.eat('RBRACKET');
+                return { type: 'array', elements };
+            }
+
+            parseParam() {
+                this.eat('PARAM');
+                const name = this.currentToken.value;
+                this.eat('IDENTIFIER');
+                const value = this.parseExpression();
+                return { type: 'param', name, value };
+            }
+
+            parseShape() {
+                this.eat('SHAPE');
+                const shapeType = this.currentToken.value.toLowerCase();
+                this.eat(this.currentToken.type);  // Could be CUBE, SPHERE, etc. or IDENTIFIER
+                let shapeName = null;
+                if (this.currentToken.type === 'IDENTIFIER') {
+                    shapeName = this.currentToken.value;
+                    this.eat('IDENTIFIER');
+                }
+                this.eat('LBRACE');
+                const params = {};
+                while (this.currentToken.type !== 'RBRACE') {
+                    const paramName = this.currentToken.value.toLowerCase();
+                    this.eat(this.currentToken.type);  // Could be POSITION, COLOR, etc. or IDENTIFIER
+                    this.eat('COLON');
+                    params[paramName] = this.parseExpression();
+                    
+                    // If it's not the last parameter, there could be a comma
+                    if (this.currentToken.type === 'COMMA') {
+                        this.eat('COMMA');
+                    }
+                }
+                this.eat('RBRACE');
+                return { type: 'shape', shapeType, name: shapeName, params };
+            }
+
+            parseLayer() {
+                this.eat('LAYER');
+                const name = this.currentToken.value;
+                this.eat('IDENTIFIER');
+                this.eat('LBRACE');
+                const commands = [];
+                while (this.currentToken.type !== 'RBRACE') {
+                    if (this.currentToken.type === 'ADD') {
+                        this.eat('ADD');
+                        commands.push({ type: 'add', shape: this.currentToken.value });
+                        this.eat('IDENTIFIER');
+                    } else if (this.currentToken.type === 'POSITION') {
+                        this.eat('POSITION');
+                        this.eat('COLON');
+                        commands.push({ type: 'position', value: this.parseExpression() });
+                    } else if (this.currentToken.type === 'ROTATE') {
+                        this.eat('ROTATE');
+                        this.eat('COLON');
+                        commands.push({ type: 'rotate', angle: this.parseExpression() });
+                    } else if (this.currentToken.type === 'SCALE') {
+                        this.eat('SCALE');
+                        this.eat('COLON');
+                        commands.push({ type: 'scale', value: this.parseExpression() });
+                    } else {
+                        this.error(`Unknown layer command: ${this.currentToken.type}`);
+                    }
+                }
+                this.eat('RBRACE');
+                return { type: 'layer', name, commands };
+            }
+
+            parseTransform() {
+                this.eat('TRANSFORM');
+                const target = this.currentToken.value;
+                this.eat('IDENTIFIER');
+                this.eat('LBRACE');
+                const operations = [];
+                while (this.currentToken.type !== 'RBRACE') {
+                    if (this.currentToken.type === 'SCALE') {
+                        this.eat('SCALE');
+                        this.eat('COLON');
+                        operations.push({ type: 'scale', value: this.parseExpression() });
+                    } else if (this.currentToken.type === 'ROTATE') {
+                        this.eat('ROTATE');
+                        this.eat('COLON');
+                        operations.push({ type: 'rotate', angle: this.parseExpression() });
+                    } else if (this.currentToken.type === 'POSITION') {
+                        this.eat('POSITION');
+                        this.eat('COLON');
+                        operations.push({ type: 'translate', value: this.parseExpression() });
+                    } else {
+                        this.error(`Unknown transform command: ${this.currentToken.type}`);
+                    }
+                }
+                this.eat('RBRACE');
+                return { type: 'transform', target, operations };
+            }
+
+            parseStatement() {
+                let statement;
+                switch (this.currentToken.type) {
+                    case 'PARAM':
+                        statement = this.parseParam();
+                        break;
+                    case 'SHAPE':
+                    case 'CUBE':
+                    case 'SPHERE':
+                    case 'CYLINDER':
+                    case 'CONE':
+                    case 'TORUS':
+                    case 'PLANE':
+                        statement = this.parseShape();
+                        break;
+                    case 'LAYER':
+                        statement = this.parseLayer();
+                        break;
+                    case 'TRANSFORM':
+                        statement = this.parseTransform();
+                        break;
+                    default:
+                        this.error(`Unexpected token: ${this.currentToken.type}`);
+                }
+                return statement;
+            }
+
+            parse() {
+                const statements = [];
+                while (this.currentToken.type !== 'EOF') {
+                    statements.push(this.parseStatement());
+                }
+                return statements;
+            }
+        }
+
+        // Environment Class
+        class Environment {
+            constructor() {
+                this.parameters = new Map();
+                this.shapes = new Map();
+                this.layers = new Map();
+                this.currentLayerName = null;  
+            }
+
+            getParameter(name) {
+                if (!this.parameters.has(name)) {
+                    throw new Error(`Parameter not found: ${name}`);
+                }
+                return this.parameters.get(name);
+            }
+
+            setParameter(name, value) {
+                this.parameters.set(name, value);
+            }
+
+            addShape(name, shape) {
+                this.shapes.set(name, shape);
+                return shape;
+            }
+
+            createShape(type, name, params) {
+                // Default 3D transform includes z-coordinate
+                const defaultPosition = params.position || [0, 0, 0];
+                const position = Array.isArray(defaultPosition) ? defaultPosition : [0, 0, 0];
+                
+                // Ensure we have a 3D position array
+                if (position.length === 2) {
+                    position.push(0); // Add z=0 if only x,y provided
+                }
+                
+                const shape = {
+                    type,
+                    name,
+                    params: { ...params },
+                    transform: {
+                        position: position,
+                        rotation: params.rotation || [0, 0, 0],
+                        scale: params.scale || [1, 1, 1]
+                    },
+                    layerName: null  
+                };
+                
+                this.shapes.set(name, shape);
+                return shape;
+            }
+
+            getShape(name) {
+                if (!this.shapes.has(name)) {
+                    throw new Error(`Shape not found: ${name}`);
+                }
+                return this.shapes.get(name);
+            }
+
+            createLayer(name) {
+                const layer = {
+                    name,
+                    addedShapes: new Set(),  
+                    operations: [],
+                    transform: {
+                        position: [0, 0, 0],
+                        rotation: [0, 0, 0],
+                        scale: [1, 1, 1]
+                    }
+                };
+                this.layers.set(name, layer);
+                this.currentLayerName = name;
+                return layer;
+            }
+
+            addShapeToLayer(layerName, shapeName) {
+                const layer = this.layers.get(layerName);
+                if (!layer) {
+                    throw new Error(`Layer not found: ${layerName}`);
+                }
+                layer.addedShapes.add(shapeName);
+                const shape = this.shapes.get(shapeName);
+                if (shape) {
+                    shape.layerName = layerName;
+                }
+            }
+
+            isShapeInLayer(shapeName, layerName) {
+                const layer = this.layers.get(layerName);
+                return layer && layer.addedShapes.has(shapeName);
+            }
+        }
+
+        // Interpreter Class
+        class Interpreter {
+            constructor() {
+                this.env = new Environment();
+            }
+
+            interpret(ast) {
+                for (const node of ast) {
+                    this.evaluateNode(node);
+                }
+                return {
+                    parameters: this.env.parameters,
+                    shapes: this.env.shapes,
+                    layers: this.env.layers
+                };
+            }
+
+            evaluateNode(node) {
+                switch (node.type) {
+                    case 'param':
+                        return this.evaluateParam(node);
+                    case 'shape':
+                        return this.evaluateShape(node);
+                    case 'layer':
+                        return this.evaluateLayer(node);
+                    case 'transform':
+                        return this.evaluateTransform(node);
+                    default:
+                        throw new Error(`Unknown node type: ${node.type}`);
+                }
+            }
+
+            evaluateParam(node) {
+                const value = this.evaluateExpression(node.value);
+                this.env.setParameter(node.name, value);
+                return value;
+            }
+
+            evaluateShape(node) {
+                const params = {};
+                for (const [key, expr] of Object.entries(node.params)) {
+                    params[key] = this.evaluateExpression(expr);
+                }
+                return this.env.createShape(node.shapeType, node.name, params);
+            }
+
+            evaluateLayer(node) {
+                const layer = this.env.createLayer(node.name);
+                
+                for (const cmd of node.commands) {
+                    switch (cmd.type) {
+                        case 'add': {
+                            this.env.addShapeToLayer(node.name, cmd.shape);
+                            break;
+                        }
+                        case 'rotate': {
+                            const angle = this.evaluateExpression(cmd.angle);
+                            if (Array.isArray(angle)) {
+                                layer.transform.rotation = angle;
+                            } else {
+                                layer.transform.rotation = [0, angle, 0]; // Default to Y-axis rotation
+                            }
+                            break;
+                        }
+                        case 'position': {
+                            const pos = this.evaluateExpression(cmd.value);
+                            if (Array.isArray(pos)) {
+                                if (pos.length === 2) {
+                                    layer.transform.position = [pos[0], pos[1], 0];
+                                } else {
+                                    layer.transform.position = pos;
+                                }
+                            }
+                            break;
+                        }
+                        case 'scale': {
+                            const scale = this.evaluateExpression(cmd.value);
+                            if (Array.isArray(scale)) {
+                                if (scale.length === 2) {
+                                    layer.transform.scale = [scale[0], scale[1], 1];
+                                } else {
+                                    layer.transform.scale = scale;
+                                }
+                            } else if (typeof scale === 'number') {
+                                layer.transform.scale = [scale, scale, scale];
+                            }
+                            break;
+                        }
+                    }
+                }
+                return layer;
+            }
+
+            evaluateTransform(node) {
+                const target = this.env.getShape(node.target);
+                if (!target) {
+                    throw new Error(`Transform target not found: ${node.target}`);
+                }
+
+                for (const op of node.operations) {
+                    switch (op.type) {
+                        case 'scale': {
+                            const scaleVal = this.evaluateExpression(op.value);
+                            if (Array.isArray(scaleVal)) {
+                                if (scaleVal.length === 2) {
+                                    target.transform.scale = [scaleVal[0], scaleVal[1], 1];
+                                } else {
+                                    target.transform.scale = scaleVal;
+                                }
+                            } else if (typeof scaleVal === 'number') {
+                                target.transform.scale = [scaleVal, scaleVal, scaleVal];
+                            }
+                            break;
+                        }
+                        case 'rotate': {
+                            const angle = this.evaluateExpression(op.angle);
+                            if (Array.isArray(angle)) {
+                                if (angle.length === 2) {
+                                    target.transform.rotation = [angle[0], angle[1], 0];
+                                } else {
+                                    target.transform.rotation = angle;
+                                }
+                            } else if (typeof angle === 'number') {
+                                target.transform.rotation = [0, angle, 0]; // Default to Y-axis rotation
+                            }
+                            break;
+                        }
+                        case 'translate': {
+                            const pos = this.evaluateExpression(op.value);
+                            if (Array.isArray(pos)) {
+                                if (pos.length === 2) {
+                                    target.transform.position = [pos[0], pos[1], 0];
+                                } else {
+                                    target.transform.position = pos;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+                return target;
+            }
+
+            evaluateExpression(expr) {
+                switch (expr.type) {
+                    case 'number':
+                        return expr.value;
+                    case 'string':
+                        return expr.value;
+                    case 'boolean':
+                        return expr.value;
+                    case 'identifier':
+                        if (expr.name.startsWith('param.')) {
+                            const paramName = expr.name.split('.')[1];
+                            return this.env.getParameter(paramName);
+                        }
+                        return this.env.getParameter(expr.name);
+                    case 'binary_op':
+                        return this.evaluateBinaryOp(expr);
+                    case 'unary_op':
+                        return this.evaluateUnaryOp(expr);
+                    case 'array':
+                        return expr.elements.map(e => this.evaluateExpression(e));
+                    default:
+                        throw new Error(`Unknown expression type: ${expr.type}`);
+                }
+            }
+
+            evaluateBinaryOp(expr) {
+                const left = this.evaluateExpression(expr.left);
+                const right = this.evaluateExpression(expr.right);
+                
+                switch (expr.operator) {
+                    case 'plus':
+                        return left + right;
+                    case 'minus':
+                        return left - right;
+                    case 'multiply':
+                        return left * right;
+                    case 'divide':
+                        if (right === 0) throw new Error('Division by zero');
+                        return left / right;
+                    default:
+                        throw new Error(`Unknown binary operator: ${expr.operator}`);
+                }
+            }
+
+            evaluateUnaryOp(expr) {
+                const operand = this.evaluateExpression(expr.operand);
+                switch (expr.operator) {
+                    case 'minus':
+                        return -operand;
+                    case 'plus':
+                        return +operand;
+                    default:
+                        throw new Error(`Unknown unary operator: ${expr.operator}`);
+                }
+            }
+        }
+
+        // =========================================================
+        // Three.js Implementation
+        // =========================================================
+
+        // Global variables
+        let currentPanel = null;
+        let renderer;
+        let scene;
+        let camera;
+        let controls;
+        let aquiObjects = new Map(); // Store Three.js objects created from Aqui shapes
+        let editor; // CodeMirror editor instance
+
+        // DOM elements
+        const canvas = document.getElementById('canvas');
+        const runButton = document.getElementById('run-button');
+        const viewAstButton = document.getElementById('view-ast');
+        const viewErrorsButton = document.getElementById('view-errors');
+        const exportGltfButton = document.getElementById('export-gltf');
+        const astPanel = document.getElementById('ast-panel');
+        const errorPanel = document.getElementById('error-panel');
+        const astOutput = document.getElementById('ast-output');
+        const errorOutput = document.getElementById('error-output');
+        const errorCount = document.getElementById('error-count');
+
+        // Initialize Three.js Scene
+        function initThreeJS() {
+            // Create scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xffffff);
+
+            // Setup camera
+            const container = canvas.parentElement;
+            camera = new THREE.PerspectiveCamera(
+                75,
+                container.clientWidth / container.clientHeight,
+                0.1,
+                1000
+            );
+            camera.position.set(5, 5, 5);
+            camera.lookAt(0, 0, 0);
+
+            // Setup renderer
+            renderer = new THREE.WebGLRenderer({
+                canvas: canvas,
+                antialias: true
+            });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(container.clientWidth, container.clientHeight);
+
+            // Setup controls
+            controls = new OrbitControls(camera, canvas);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(10, 10, 10);
+            scene.add(directionalLight);
+
+            // Add helpers
+            const gridHelper = new THREE.GridHelper(10, 10, 0xcccccc, 0xcccccc);
+            scene.add(gridHelper);
+
+            const axesHelper = new THREE.AxesHelper(5);
+            scene.add(axesHelper);
+
+            // Start animation loop
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function setupCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+
+            if (camera) {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            }
+        }
+
+        function showPanel(panel) {
+            if (currentPanel) {
+                currentPanel.classList.remove('visible');
+            }
+            if (currentPanel !== panel) {
+                panel.classList.add('visible');
+                currentPanel = panel;
+            } else {
+                currentPanel = null;
+            }
+        }
+
+        function displayErrors(errors) {
+            const errorArray = Array.isArray(errors) ? errors : [errors];
+            errorOutput.innerHTML = errorArray.map(error => {
+                const location = error.line ? 
+                    `<div class="error-location">Line ${error.line}, Column ${error.column}</div>` : '';
+                return `<div class="error-message">${error.message}${location}</div>`;
+            }).join('');
+
+            errorCount.textContent = errorArray.length;
+            errorCount.classList.toggle('visible', errorArray.length > 0);
+            viewErrorsButton.classList.toggle('error', errorArray.length > 0);
+        }
+
+        function clearScene() {
+            // Remove previous Aqui objects
+            aquiObjects.forEach(object => {
+                scene.remove(object);
+            });
+            aquiObjects.clear();
+            
+            // Keep essential scene elements
+            // Re-add lights and helpers
+            while(scene.children.length > 0){ 
+                scene.remove(scene.children[0]); 
+            }
+            
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(10, 10, 10);
+            scene.add(directionalLight);
+
+            const gridHelper = new THREE.GridHelper(10, 10);
+            scene.add(gridHelper);
+
+            const axesHelper = new THREE.AxesHelper(5);
+            scene.add(axesHelper);
+        }
+
+        // Convert Aqui shape to Three.js object
+        function createThreeJSObject(shape) {
+            let geometry, material, object;
+            
+            // Parse color (handle both hex strings and numeric values)
+            let color = 0x00ff9d; // Default color
+            if (shape.params.color) {
+                if (typeof shape.params.color === 'string' && shape.params.color.startsWith('#')) {
+                    color = shape.params.color;
+                } else if (typeof shape.params.color === 'number') {
+                    color = shape.params.color;
+                }
+            }
+            
+            const opacity = shape.params.opacity !== undefined ? shape.params.opacity : 0.8;
+            const transparent = opacity < 1;
+            
+            material = new THREE.MeshStandardMaterial({ 
+                color: color,
+                transparent: transparent,
+                opacity: opacity
+            });
+
+            switch (shape.type) {
+                case 'cube':
+                    const width = shape.params.width || 1;
+                    const height = shape.params.height || 1;
+                    const depth = shape.params.depth || 1;
+                    const segments = shape.params.segments || 1;
+                    
+                    geometry = new THREE.BoxGeometry(width, height, depth, segments, segments, segments);
+                    break;
+                    
+                case 'sphere':
+                    const radius = shape.params.radius || 1;
+                    const widthSegments = shape.params.widthSegments || 32;
+                    const heightSegments = shape.params.heightSegments || 16;
+                    
+                    geometry = new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+                    break;
+                    
+                case 'cylinder':
+                    const radiusTop = shape.params.radiusTop || shape.params.radius || 1;
+                    const radiusBottom = shape.params.radiusBottom || shape.params.radius || 1;
+                    const cylinderHeight = shape.params.height || 1;
+                    const radialSegments = shape.params.radialSegments || 32;
+                    
+                    geometry = new THREE.CylinderGeometry(
+                        radiusTop, radiusBottom, cylinderHeight, radialSegments
+                    );
+                    break;
+                    
+                case 'cone':
+                    const coneRadius = shape.params.radius || 1;
+                    const coneHeight = shape.params.height || 1;
+                    const coneSegments = shape.params.segments || 32;
+                    
+                    geometry = new THREE.ConeGeometry(coneRadius, coneHeight, coneSegments);
+                    break;
+                    
+                case 'torus':
+                    const torusRadius = shape.params.radius || 1;
+                    const tubeRadius = shape.params.tubeRadius || 0.4;
+                    const tubularSegments = shape.params.tubularSegments || 32;
+                    const radialSegments2 = shape.params.radialSegments || 16;
+                    
+                    geometry = new THREE.TorusGeometry(
+                        torusRadius, tubeRadius, radialSegments2, tubularSegments
+                    );
+                    break;
+                    
+                case 'plane':
+                    const planeWidth = shape.params.width || 1;
+                    const planeHeight = shape.params.height || 1;
+                    const widthSegments2 = shape.params.widthSegments || 1;
+                    const heightSegments2 = shape.params.heightSegments || 1;
+                    
+                    geometry = new THREE.PlaneGeometry(
+                        planeWidth, planeHeight, widthSegments2, heightSegments2
+                    );
+                    break;
+                    
+                default:
+                    // Default to a cube if shape type is unknown
+                    console.warn(`Unknown shape type: ${shape.type}, defaulting to cube`);
+                    geometry = new THREE.BoxGeometry(1, 1, 1);
+                    break;
+            }
+            
+            object = new THREE.Mesh(geometry, material);
+            
+            // Apply transformations
+            if (shape.transform) {
+                // Position
+                if (shape.transform.position) {
+                    object.position.set(
+                        shape.transform.position[0] || 0,
+                        shape.transform.position[1] || 0,
+                        shape.transform.position[2] || 0
+                    );
+                }
+                
+                // Rotation (convert degrees to radians)
+                if (shape.transform.rotation) {
+                    if (Array.isArray(shape.transform.rotation)) {
+                        object.rotation.set(
+                            (shape.transform.rotation[0] * Math.PI) / 180,
+                            (shape.transform.rotation[1] * Math.PI) / 180,
+                            (shape.transform.rotation[2] * Math.PI) / 180
+                        );
+                    } else {
+                        const rotX = (shape.transform.rotation * Math.PI) / 180;
+                        object.rotation.y = rotX;
+                    }
+                }
+                
+                // Scale
+                if (shape.transform.scale) {
+                    // Handle both array and single number for scale
+                    if (Array.isArray(shape.transform.scale)) {
+                        object.scale.set(
+                            shape.transform.scale[0] || 1,
+                            shape.transform.scale[1] || 1, 
+                            shape.transform.scale.length > 2 ? shape.transform.scale[2] : 1
+                        );
+                    } else {
+                        const scaleValue = shape.transform.scale;
+                        object.scale.set(scaleValue, scaleValue, scaleValue);
+                    }
+                }
+            }
+            
+            return object;
+        }
+
+        function handleLayer(layer) {
+            // Create a group for the layer
+            const group = new THREE.Group();
+            scene.add(group);
+            
+            // Add shapes to the group
+            layer.addedShapes.forEach(shapeName => {
+                const object = aquiObjects.get(shapeName);
+                if (object) {
+                    // Remove from scene and add to group
+                    scene.remove(object);
+                    group.add(object);
+                }
+            });
+            
+            // Apply layer transformations
+            if (layer.transform) {
+                // Position
+                if (layer.transform.position) {
+                    group.position.set(
+                        layer.transform.position[0] || 0,
+                        layer.transform.position[1] || 0,
+                        layer.transform.position[2] || 0
+                    );
+                }
+                
+                // Rotation
+                if (layer.transform.rotation) {
+                    if (Array.isArray(layer.transform.rotation)) {
+                        group.rotation.set(
+                            (layer.transform.rotation[0] * Math.PI) / 180,
+                            (layer.transform.rotation[1] * Math.PI) / 180,
+                            (layer.transform.rotation[2] * Math.PI) / 180
+                        );
+                    } else {
+                        group.rotation.y = (layer.transform.rotation * Math.PI) / 180;
+                    }
+                }
+                
+                // Scale
+                if (layer.transform.scale) {
+                    if (Array.isArray(layer.transform.scale)) {
+                        group.scale.set(
+                            layer.transform.scale[0] || 1,
+                            layer.transform.scale[1] || 1,
+                            layer.transform.scale[2] || 1
+                        );
+                    } else {
+                        const scale = layer.transform.scale;
+                        group.scale.set(scale, scale, scale);
+                    }
+                }
+            }
+            
+            // Store the group in aquiObjects with the layer name
+            aquiObjects.set(layer.name, group);
+        }
+
+        function runCode() {
+            try {
+                clearScene();
+                const code = editor.getValue();
+                
+                // Use the Aqui language processing pipeline
+                const lexer = new Lexer(code);
+                const parser = new Parser(lexer);
+                const ast = parser.parse();
+                
+                // Display the AST for debugging
+                astOutput.textContent = JSON.stringify(ast, null, 2);
+                
+                // Interpret the AST
+                const interpreter = new Interpreter();
+                const result = interpreter.interpret(ast);
+                
+                // Create Three.js objects from Aqui shapes
+                result.shapes.forEach((shape, name) => {
+                    const threeObject = createThreeJSObject(shape);
+                    scene.add(threeObject);
+                    aquiObjects.set(name, threeObject);
+                });
+                
+                // Handle layers
+                result.layers.forEach((layer, name) => {
+                    handleLayer(layer);
+                });
+                
+                displayErrors([]);
+            } catch (error) {
+                console.error(error);
+                displayErrors({
+                    message: error.message,
+                    line: error.line,
+                    column: error.column
+                });
+            }
+        }
+
+        function exportGLTF() {
+            try {
+                const exporter = new GLTFExporter();
+                exporter.parse(scene, function (result) {
+                    const output = JSON.stringify(result, null, 2);
+                    const blob = new Blob([output], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'scene.gltf';
+                    link.click();
+                    URL.revokeObjectURL(url);
+                }, { binary: false });
+            } catch (error) {
+                console.error('GLTF Export error:', error);
+                displayErrors([{ message: `GLTF Export failed: ${error.message}` }]);
+            }
+        }
+
+        // Initialize CodeMirror with extended Aqui syntax for 3D
+        CodeMirror.defineSimpleMode("aqui3d", {
+            start: [
+                { regex: /\/\/.*/, token: "comment" },
+                { regex: /\b(param|shape|cube|sphere|cylinder|cone|torus|plane|transform|rotate|scale|position|color|opacity|width|height|depth|segments|radius)\b/, token: "keyword" },
+                { regex: /\b(if|else|for|from|to|step|union|difference|intersection|layer|add)\b/, token: "keyword" },
+                { regex: /\b(true|false)\b/, token: "atom" },
+                { regex: /#[0-9a-fA-F]{3,6}/, token: "atom" }, // Hex colors
+                { regex: /\b\d+(\.\d+)?\b/, token: "number" },
+                { regex: /"(?:[^\\]|\\.)*?"/, token: "string" },
+                { regex: /[\{\}\[\]:,]/, token: "operator" },
+                { regex: /[+\-*\/=<>!&|]/, token: "operator" }
+            ]
+        });
+
+        editor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+            mode: "aqui3d",
+            theme: "default",
+            lineNumbers: true,
+            autoCloseBrackets: true,
+            matchBrackets: true
+        });
+
+        // Set up event listeners
+        runButton.addEventListener('click', runCode);
+        viewAstButton.addEventListener('click', () => showPanel(astPanel));
+        viewErrorsButton.addEventListener('click', () => showPanel(errorPanel));
+        exportGltfButton.addEventListener('click', exportGLTF);
+        window.addEventListener("resize", setupCanvas);
+
+        // Add keyboard shortcut
+        editor.on("keydown", (cm, event) => {
+            if (event.shiftKey && event.key === "Enter") {
+                event.preventDefault();
+                runCode();
+            }
+        });
+
+        // Initialize everything 
+        initThreeJS();
+        setupCanvas();
+        runCode();
+    </script>
 </body>
 </html>
