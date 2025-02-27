@@ -73,7 +73,7 @@ export class Lexer {
       this.advance();
     }
     
-    // Extended keywords for conditionals
+    // Extended keywords
     const keywords = {
       'param': 'PARAM',
       'shape': 'SHAPE',
@@ -99,7 +99,18 @@ export class Lexer {
       'union': 'UNION',
       'difference': 'DIFFERENCE',
       'intersection': 'INTERSECTION',
-      'in': 'IN'
+      'in': 'IN',
+      'def': 'DEF',
+      'return': 'RETURN',
+      // Drawing commands
+      'draw': 'DRAW',
+      'forward': 'FORWARD',
+      'backward': 'BACKWARD',
+      'right': 'RIGHT',
+      'left': 'LEFT',
+      'goto': 'GOTO',
+      'penup': 'PENUP',
+      'pendown': 'PENDOWN'
     };
     
     const type = keywords[result.toLowerCase()] || 'IDENTIFIER';
