@@ -302,37 +302,70 @@ class Text extends Shape {
     }
 }
 
-// 12. Bezier Curve
 class BezierCurve extends Shape {
     constructor(startPoint, controlPoint1, controlPoint2, endPoint) {
         super();
-        this.startPoint = startPoint;
-        this.controlPoint1 = controlPoint1;
-        this.controlPoint2 = controlPoint2;
-        this.endPoint = endPoint;
+        this.start = startPoint;
+        this.cp1 = controlPoint1;
+        this.cp2 = controlPoint2;
+        this.end = endPoint;
     }
 
-    getPoints(segments = 32) {
+    getPoints(segments = 100) {
         const points = [];
+        
+        // Calculate points along the curve using Bézier formula
         for (let t = 0; t <= 1; t += 1/segments) {
-            const point = this.calculateBezierPoint(t);
+            const point = this.getPointAtT(t);
             points.push(point);
         }
+        
         return points.map(p => this.transformPoint(p));
     }
 
-    calculateBezierPoint(t) {
-        const x = Math.pow(1-t, 3) * this.startPoint.x +
-                 3 * Math.pow(1-t, 2) * t * this.controlPoint1.x +
-                 3 * (1-t) * Math.pow(t, 2) * this.controlPoint2.x +
-                 Math.pow(t, 3) * this.endPoint.x;
-        const y = Math.pow(1-t, 3) * this.startPoint.y +
-                 3 * Math.pow(1-t, 2) * t * this.controlPoint1.y +
-                 3 * (1-t) * Math.pow(t, 2) * this.controlPoint2.y +
-                 Math.pow(t, 3) * this.endPoint.y;
-        return { x, y };
+    getPointAtT(t) {
+        // Cubic Bézier formula: B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
+        const mt = 1 - t;
+        const mt2 = mt * mt;
+        const mt3 = mt2 * mt;
+        const t2 = t * t;
+        const t3 = t2 * t;
+
+        return {
+            x: mt3 * this.start[0] + 
+               3 * mt2 * t * this.cp1[0] + 
+               3 * mt * t2 * this.cp2[0] + 
+               t3 * this.end[0],
+            y: mt3 * this.start[1] + 
+               3 * mt2 * t * this.cp1[1] + 
+               3 * mt * t2 * this.cp2[1] + 
+               t3 * this.end[1]
+        };
+    }
+
+    draw(ctx) {
+        ctx.save();
+        this.transform(ctx);
+
+        ctx.beginPath();
+        ctx.moveTo(this.start[0], this.start[1]);
+        ctx.bezierCurveTo(
+            this.cp1[0], this.cp1[1],
+            this.cp2[0], this.cp2[1],
+            this.end[0], this.end[1]
+        );
+
+        // Set line style
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        ctx.restore();
     }
 }
+
 
 // 13. Donut (Annulus)
 class Donut extends Shape {
@@ -342,24 +375,39 @@ class Donut extends Shape {
         this.innerRadius = innerRadius;
     }
 
-    getPoints(segments = 32) {
+    getPoints(segments = 64) {
         const points = [];
+        
         // Outer circle
-        for (let i = 0; i < segments; i++) {
+        for (let i = 0; i <= segments; i++) {
             const angle = (i / segments) * Math.PI * 2;
             points.push({
                 x: Math.cos(angle) * this.outerRadius,
                 y: Math.sin(angle) * this.outerRadius
             });
         }
+        
+        // Add a line to the inner circle start
+        points.push({
+            x: Math.cos(0) * this.innerRadius,
+            y: Math.sin(0) * this.innerRadius
+        });
+        
         // Inner circle (in reverse to create hole)
-        for (let i = segments - 1; i >= 0; i--) {
+        for (let i = segments; i >= 0; i--) {
             const angle = (i / segments) * Math.PI * 2;
             points.push({
                 x: Math.cos(angle) * this.innerRadius,
                 y: Math.sin(angle) * this.innerRadius
             });
         }
+        
+        // Close the path by connecting back to the start of outer circle
+        points.push({
+            x: Math.cos(0) * this.outerRadius,
+            y: Math.sin(0) * this.outerRadius
+        });
+
         return points.map(p => this.transformPoint(p));
     }
 }
@@ -482,20 +530,20 @@ class Slot extends Shape {
         const points = [];
         const centerDist = (this.length - this.width)/2;
 
-        // Add first semicircle
+        // Add right semicircle
         for (let i = 0; i <= segments/2; i++) {
-            const angle = Math.PI + (i / (segments/2)) * Math.PI;
+            const angle = (-Math.PI/2) + (i / (segments/2)) * Math.PI;
             points.push({
-                x: -centerDist + Math.cos(angle) * this.radius,
+                x: centerDist + Math.cos(angle) * this.radius,
                 y: Math.sin(angle) * this.radius
             });
         }
 
-        // Add second semicircle
+        // Add left semicircle
         for (let i = 0; i <= segments/2; i++) {
-            const angle = (i / (segments/2)) * Math.PI;
+            const angle = (Math.PI/2) + (i / (segments/2)) * Math.PI;
             points.push({
-                x: centerDist + Math.cos(angle) * this.radius,
+                x: -centerDist + Math.cos(angle) * this.radius,
                 y: Math.sin(angle) * this.radius
             });
         }
@@ -535,26 +583,69 @@ class ChamferRectangle extends Shape {
 
 // 20. Polygon with Holes
 class PolygonWithHoles extends Shape {
-    constructor(outerPoints, holes = []) {
+    constructor(outerPath, holes = []) {
         super();
-        this.outerPoints = outerPoints;
-        this.holes = holes; // Array of arrays of points
+        this.outerPath = outerPath;
+        this.holes = holes;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        this.transform(ctx);
+
+        // Draw outer path
+        ctx.beginPath();
+        this.drawPath(ctx, this.outerPath);
+
+        // Draw holes using counter-clockwise winding
+        for (const hole of this.holes) {
+            this.drawPath(ctx, this.reversePath(hole));
+        }
+
+        // Fill with even-odd rule
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.fill('evenodd');
+
+        // Stroke both outer shape and holes
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    drawPath(ctx, points) {
+        ctx.moveTo(points[0][0], points[0][1]);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i][0], points[i][1]);
+        }
+        ctx.closePath();
+    }
+
+    reversePath(points) {
+        return [...points].reverse();
     }
 
     getPoints() {
-        let allPoints = [...this.outerPoints];
+        const points = [...this.outerPath];
         
-        // Add holes in reverse order to create proper path
-        this.holes.forEach(hole => {
-            allPoints.push(allPoints[0]); // Bridge to hole
-            allPoints.push(...hole.reverse()); // Add hole points
-            allPoints.push(hole[0]); // Close hole
-        });
+        // Add holes with bridges to maintain single path
+        for (const hole of this.holes) {
+            // Add bridge to hole
+            points.push(points[0]); // Move to start of outer path
+            points.push(hole[0]);   // Bridge to hole
+            
+            // Add hole points in reverse order
+            points.push(...this.reversePath(hole));
+            
+            // Close hole and bridge back
+            points.push(hole[0]);
+            points.push(points[0]);
+        }
         
-        return allPoints.map(p => this.transformPoint(p));
+        return points.map(p => this.transformPoint(p));
     }
 }
-
 // Utility functions for shape operations
 const ShapeUtils = {
     // Boolean operations
