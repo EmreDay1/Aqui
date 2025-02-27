@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>AQUI</title>
+  
+  <!-- CodeMirror Dependencies -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/mode/simple.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/comment/comment.min.js"></script>
+  
+  <!-- Marked for Markdown rendering -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      font-family: monospace;
+      background: #fff;
+    }
+
+    .header {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      border-bottom: 1px solid #ccc;
+      background: #f8f8f8;
+    }
+
+    .logo {
+      font-weight: bold;
+      font-size: 18px;
+    }
+
+    .tabs {
+      margin-left: 20px;
+      display: flex;
+      align-items: center;
+      height: 100%;
+    }
+
+    .tab-btn {
+      padding: 0 16px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 14px;
+      border-right: 1px solid #e0e0e0;
+    }
+
+    .tab-btn.active {
+      font-weight: bold;
+      background: white;
+      border-bottom: 2px solid #1289d8;
+    }
+
+    .tab-content {
+      display: none;
+      flex: 1;
+      min-height: 0;
+      flex-direction: column;
+    }
+
+    .tab-content.active {
+      display: flex;
+    }
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    .editor-panel {
+      width: 50%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #ccc;
+    }
+
+    .CodeMirror {
+      height: 100%;
+      font-size: 14px;
+      background: #fdf6e3;
+    }
+
+    .visualization-panel {
+      width: 50%;
+      position: relative;
+    }
+
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .footer {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      border-top: 1px solid #ccc;
+      background: #f8f8f8;
+    }
+
+    .button {
+      padding: 8px 16px;
+      margin-right: 10px;
+      font-family: monospace;
+      border: none;
+      background: #e0e0e0;
+      cursor: pointer;
+    }
+
+    .button:hover {
+      background: #d0d0d0;
+    }
+
+    .button.error {
+      background: #ffebee;
+    }
+
+    .button.error:hover {
+      background: #ffcdd2;
+    }
+
+    .panel {
+      position: absolute;
+      bottom: 48px;
+      left: 0;
+      right: 0;
+      height: 200px;
+      background: white;
+      border-top: 1px solid #ccc;
+      padding: 16px;
+      display: none;
+      font-family: monospace;
+      font-size: 12px;
+      overflow: auto;
+    }
+
+    .panel.visible {
+      display: block;
+    }
+
+    #error-panel .error-message {
+      color: #d32f2f;
+      margin-bottom: 8px;
+      white-space: pre-wrap;
+    }
+
+    #error-panel .error-location {
+      color: #666;
+      font-size: 11px;
+      margin-bottom: 16px;
+    }
+
+    .error-count {
+      background: #d32f2f;
+      color: white;
+      border-radius: 10px;
+      padding: 2px 6px;
+      font-size: 11px;
+      margin-left: 6px;
+      display: none;
+    }
+
+    .error-count.visible {
+      display: inline-block;
+    }
+
+    /* Documentation styles */
+    .docs-content {
+      flex: 1;
+      padding: 20px 40px;
+      overflow-y: auto;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      color: #333;
+    }
+
+    .docs-content h1 {
+      font-size: 28px;
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    .docs-content h2 {
+      font-size: 22px;
+      margin-top: 30px;
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #eee;
+      color: #444;
+    }
+
+    .docs-content h3 {
+      font-size: 18px;
+      margin-top: 25px;
+      margin-bottom: 10px;
+      color: #555;
+    }
+
+    .docs-content h4 {
+      font-size: 16px;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      color: #666;
+    }
+
+    .docs-content p {
+      margin-bottom: 16px;
+    }
+
+    .docs-content code {
+      font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+      background-color: #f5f5f5;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-size: 85%;
+    }
+
+    .docs-content pre {
+      background-color: #f5f5f5;
+      padding: 16px;
+      border-radius: 3px;
+      overflow: auto;
+      margin-bottom: 16px;
+    }
+
+    .docs-content pre code {
+      background-color: transparent;
+      padding: 0;
+      font-size: 14px;
+    }
+
+    .docs-content ul, .docs-content ol {
+      margin-bottom: 16px;
+      padding-left: 30px;
+    }
+
+    .docs-content li {
+      margin-bottom: 8px;
+    }
+
+    .docs-content a {
+      color: #0366d6;
+      text-decoration: none;
+    }
+
+    .docs-content a:hover {
+      text-decoration: underline;
+    }
+
+    .docs-content blockquote {
+      border-left: 4px solid #ddd;
+      padding-left: 16px;
+      color: #666;
+      margin: 0 0 16px;
+    }
+
+    .docs-content hr {
+      height: 1px;
+      background-color: #ddd;
+      border: none;
+      margin: 24px 0;
+    }
+
+    .docs-content table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-bottom: 16px;
+    }
+
+    .docs-content th, .docs-content td {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+    }
+
+    .docs-content th {
+      background-color: #f5f5f5;
+      font-weight: bold;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">Aqui.)</div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="editor-tab">AQUI</button>
+      <button class="tab-btn" data-tab="docs-tab">Docs</button>
+    </div>
+  </div>
+
+  <!-- Editor Tab -->
+  <div class="tab-content active" id="editor-tab">
+    <div class="main-content">
+      <div class="editor-panel">
+        <textarea id="code-editor">//Aqui</textarea>
+      </div>
+      <div class="visualization-panel">
+        <canvas id="canvas"></canvas>
+      </div>
+    </div>
+
+    <div class="panel" id="ast-panel">
+      <pre id="ast-output"></pre>
+    </div>
+
+    <div class="panel" id="error-panel">
+      <pre id="error-output"></pre>
+    </div>
+
+    <div class="footer">
+      <button class="button" id="run-button">Run (Shift + Enter)</button>
+      <button class="button" id="view-ast">View AST</button>
+      <button class="button error" id="view-errors">
+        Errors
+        <span class="error-count" id="error-count">0</span>
+      </button>
+      <button class="button" id="export-svg">Export SVG</button>
+    </div>
+  </div>
+
+  <!-- Documentation Tab -->
+  <div class="tab-content" id="docs-tab">
+    <div class="docs-content" id="markdown-content"></div>
+  </div>
+
+  <script type="module">
+    let currentPanel = null;
+    let interpreter;
+
+    const canvas = document.getElementById('canvas');
+    const runButton = document.getElementById('run-button');
+    const viewAstButton = document.getElementById('view-ast');
+    const viewErrorsButton = document.getElementById('view-errors');
+    const exportSvgButton = document.getElementById('export-svg');
+    const astPanel = document.getElementById('ast-panel');
+    const errorPanel = document.getElementById('error-panel');
+    const astOutput = document.getElementById('ast-output');
+    const errorOutput = document.getElementById('error-output');
+    const errorCount = document.getElementById('error-count');
+    
+    // Tab functionality
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const tabId = button.getAttribute('data-tab');
+        
+        // Deactivate all tabs
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+        
+        // Activate clicked tab
+        button.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+        
+        // If switched to editor tab, refresh the canvas
+        if (tabId === 'editor-tab' && interpreter) {
+          renderer.setupCanvas();
+          runCode();
+        }
+      });
+    });
+
+    // Import required modules
+    const { Lexer } = await import('./lexer.mjs');
+    const { Parser } = await import('./parser.mjs');
+    const { Interpreter } = await import('./interpreter.mjs');
+    const { Renderer } = await import('./renderer.mjs');
+
+    // Initialize CodeMirror
+    CodeMirror.defineSimpleMode("aqui", {
+      start: [
+        { regex: /\/\/.*/, token: "comment" },
+        { regex: /\b(param|shape|layer|transform|add|subtract|rotate|scale|position|isBezier|isHole)\b/, token: "keyword" },
+        { regex: /\b\d+(\.\d+)?\b/, token: "number" },
+        { regex: /"(?:[^\\]|\\.)*?"/, token: "string" },
+        { regex: /[\{\}\[\]:,]/, token: "operator" }
+      ]
+    });
+
+    const editor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+      mode: "aqui",
+      theme: "default",
+      lineNumbers: true,
+      autoCloseBrackets: true,
+      matchBrackets: true
+    });
+
+    const renderer = new Renderer(canvas);
+
+    function showPanel(panel) {
+      if (currentPanel) {
+        currentPanel.classList.remove('visible');
+      }
+      if (currentPanel !== panel) {
+        panel.classList.add('visible');
+        currentPanel = panel;
+      } else {
+        currentPanel = null;
+      }
+    }
+
+    function displayErrors(errors) {
+      const errorArray = Array.isArray(errors) ? errors : [errors];
+      errorOutput.innerHTML = errorArray.map(error => {
+        const location = error.line ? 
+          `<div class="error-location">Line ${error.line}, Column ${error.column}</div>` : '';
+        return `<div class="error-message">${error.message}${location}</div>`;
+      }).join('');
+
+      errorCount.textContent = errorArray.length;
+      errorCount.classList.toggle('visible', errorArray.length > 0);
+      viewErrorsButton.classList.toggle('error', errorArray.length > 0);
+    }
+
+    function runCode() {
+      try {
+        renderer.clear();
+        const code = editor.getValue();
+        const lexer = new Lexer(code);
+        const parser = new Parser(lexer);
+        const ast = parser.parse();
+        astOutput.textContent = JSON.stringify(ast, null, 2);
+
+        interpreter = new Interpreter();
+        const result = interpreter.interpret(ast);
+
+        // Draw shapes
+        result.shapes.forEach(shape => {
+          renderer.drawShape(shape);
+        });
+
+        // Draw layers with transformations
+        result.layers.forEach(layer => {
+          const { transform } = layer;
+          layer.shapes.forEach(shape => {
+            const combinedShape = {
+              ...shape,
+              transform: {
+                position: shape.transform.position,
+                rotation: (shape.transform.rotation || 0) + (transform.rotation || 0),
+                scale: [
+                  shape.transform.scale[0] * transform.scale[0],
+                  shape.transform.scale[1] * transform.scale[1]
+                ]
+              }
+            };
+            renderer.drawShape(combinedShape);
+          });
+        });
+        
+        displayErrors([]);
+      } catch (error) {
+        console.error(error);
+        displayErrors(error);
+      }
+    }
+
+    function exportToSVG() {
+      try {
+        if (!interpreter?.env?.shapes) {
+          throw new Error('No shapes to export');
+        }
+
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, "svg");
+        
+        svg.setAttribute("xmlns", svgNS);
+        svg.setAttribute("width", canvas.width);
+        svg.setAttribute("height", canvas.height);
+        svg.setAttribute("viewBox", `0 0 ${canvas.width} ${canvas.height}`);
+
+        interpreter.env.shapes.forEach((shape) => {
+          const path = document.createElementNS(svgNS, "path");
+          let pathData = "";
+
+          if (shape.type === 'path') {
+            if (shape.params.isBezier) {
+              const pts = shape.params.points;
+              pathData = `M ${pts[0][0]} ${pts[0][1]} C ${pts[1][0]} ${pts[1][1]}, ${pts[2][0]} ${pts[2][1]}, ${pts[3][0]} ${pts[3][1]}`;
+              path.setAttribute("fill", "none");
+            } else {
+              const pts = shape.params.points;
+              pathData = `M ${pts[0][0]} ${pts[0][1]}`;
+              for (let i = 1; i < pts.length; i++) {
+                pathData += ` L ${pts[i][0]} ${pts[i][1]}`;
+              }
+              pathData += " Z";
+              path.setAttribute("fill", shape.params.isHole ? "white" : "rgba(0, 0, 0, 0.1)");
+            }
+          }
+
+          path.setAttribute("d", pathData);
+          path.setAttribute("stroke", "#000000");
+          path.setAttribute("stroke-width", "2");
+
+          // Apply transformations
+          const transform = shape.transform;
+          if (transform) {
+            const translateX = transform.position[0] || 0;
+            const translateY = transform.position[1] || 0;
+            const rotate = transform.rotation || 0;
+            const scaleX = transform.scale[0] || 1;
+            const scaleY = transform.scale[1] || 1;
+            
+            path.setAttribute("transform", 
+              `translate(${translateX} ${translateY}) rotate(${-rotate}) scale(${scaleX} ${scaleY})`
+            );
+          }
+
+          svg.appendChild(path);
+        });
+
+        // Create and trigger download
+        const serializer = new XMLSerializer();
+        const svgString = serializer.serializeToString(svg);
+        const blob = new Blob([svgString], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'shapes.svg';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+      } catch (error) {
+        console.error('SVG Export error:', error);
+        displayErrors([{ message: `SVG Export failed: ${error.message}` }]);
+      }
+    }
+
+    // Load documentation markdown
+    const documentationMarkdown = `# Aqui Programming Language Documentation
+
+## Overview
+Aqui is a domain-specific programming language designed for parametric shape creation and graphical design. It allows users to define parameters, shapes, and transformations through a structured syntax. The Aqui interpreter processes the input and renders the resulting graphics on an HTML5 Canvas.
+
+## Core Concepts
+### **1. Parameters (\`param\`)**
+Parameters allow defining variables that can be used throughout the script.
+#### **Syntax:**
+\`\`\`aqui
+param size 100
+param isVisible true
+param color "red"
+\`\`\`
+- \`size\` is a numerical parameter.
+- \`isVisible\` is a boolean parameter.
+- \`color\` is a string parameter.
+
+Parameters can be referenced using \`param.name\` inside shapes or conditions.
+
+### **2. Shapes (\`shape\`)**
+Shapes define geometric elements with configurable properties.
+#### **Syntax:**
+\`\`\`aqui
+shape circle myCircle {
+    radius: 30
+    position: [50, 50]
+}
+\`\`\`
+- \`shape\` is the keyword.
+- \`circle\` is the shape type.
+- \`myCircle\` is the shape name.
+- Properties such as \`radius\` and \`position\` define the shape's attributes.
+
+### **3. Layers (\`layer\`)**
+Layers are used to group multiple shapes and apply transformations collectively.
+#### **Syntax:**
+\`\`\`aqui
+layer main {
+    add myCircle
+    rotate 45
+}
+\`\`\`
+- \`add myCircle\` adds a shape to the layer.
+- \`rotate 45\` applies a 45-degree rotation to all elements in the layer.
+
+### **4. Transformations (\`transform\`)**
+Transformations modify the properties of shapes and layers.
+#### **Syntax:**
+\`\`\`aqui
+transform myCircle {
+    scale: 2
+    rotate: 30
+}
+\`\`\`
+- \`scale: 2\` doubles the size of the shape.
+- \`rotate: 30\` rotates the shape by 30 degrees.
+
+### **5. Conditional Statements (\`if-else\`)**
+Aqui supports conditional statements to dynamically create shapes.
+#### **Syntax:**
+\`\`\`aqui
+if param.size > 50 {
+    shape circle bigCircle {
+        radius: param.size
+        position: [100, 100]
+    }
+} else {
+    shape circle smallCircle {
+        radius: param.size / 2
+        position: [100, 100]
+    }
+}
+\`\`\`
+- If \`size\` is greater than 50, \`bigCircle\` is created.
+- Otherwise, \`smallCircle\` is created.
+
+## Loops
+
+### **1. Basic Range Loop**
+Iterates from a start value to an end value with an optional step.
+#### **Syntax:**
+\`\`\`aqui
+for iterator from start to end {
+    // shape definitions and transformations
+}
+\`\`\`
+#### **Example:**
+\`\`\`aqui
+for i from 0 to 5 {
+    shape circle circle1 {
+        radius: 10
+        position: [i * 30, 50]
+    }
+}
+\`\`\`
+- Creates circles named \`circle1_0\` through \`circle1_5\`
+- Iterator \`i\` can be used in expressions
+- Shape names are automatically indexed
+
+### **2. Step Loop**
+Includes a step value to control iteration increment.
+#### **Syntax:**
+\`\`\`aqui
+for iterator from start to end step stepValue {
+    // shape definitions and transformations
+}
+\`\`\`
+#### **Example:**
+\`\`\`aqui
+for i from 0 to 100 step 20 {
+    shape circle circle1 {
+        radius: i / 4
+        position: [i, 50]
+    }
+}
+\`\`\`
+- Creates circles with increasing radii
+- Steps by 20 units each iteration
+- Automatic naming applies as \`circle1_0\`, \`circle1_20\`, etc.
+
+### **3. Shape Naming**
+Loops automatically handle unique shape naming.
+#### **Behavior:**
+- Base shape name is suffixed with underscore and iteration number
+- Format: \`shapeName_iterationNumber\`
+- Enables referencing specific instances after loop execution
+
+#### **Example with Transforms:**
+\`\`\`aqui
+for i from 0 to 5 {
+    shape circle circle1 {
+        radius: 10
+        position: [i * 30, 50]
+    }
+}
+
+transform circle1_2 {
+    rotate: 45
+}
+\`\`\`
+- Creates multiple circles
+- Individual shapes can be referenced using generated names
+- Transforms can target specific instances
+
+### **4. Using Loop Iterator**
+The iterator variable can be used in various expressions.
+#### **Examples:**
+\`\`\`aqui
+for i from 0 to 3 {
+    shape rectangle rect1 {
+        width: i * 10
+        height: 50
+        position: [i * 40, i * 20]
+    }
+}
+\`\`\`
+- Iterator can define dimensions
+- Iterator can define positions
+- Iterator available in all expressions within loop body
+
+## Shape Classes
+Aqui supports 20 predefined shape classes:
+
+### **1. Rectangle**
+\`\`\`aqui
+shape rectangle myRect {
+    width: 100
+    height: 50
+    position: [50, 50]
+}
+\`\`\`
+- Defines a rectangle with width, height, and position.
+
+### **2. Circle**
+\`\`\`aqui
+shape circle myCircle {
+    radius: 30
+    position: [50, 50]
+}
+\`\`\`
+- Defines a circle with a radius and position.
+
+### **3. Triangle**
+\`\`\`aqui
+shape triangle myTriangle {
+    base: 60
+    height: 80
+    position: [50, 50]
+}
+\`\`\`
+- Defines a triangle with a base and height.
+
+### **4. Ellipse**
+\`\`\`aqui
+shape ellipse myEllipse {
+    radiusX: 40
+    radiusY: 20
+    position: [50, 50]
+}
+\`\`\`
+- Defines an ellipse with different X and Y radii.
+
+### **5. Regular Polygon**
+\`\`\`aqui
+shape polygon myPolygon {
+    radius: 50
+    sides: 6
+    position: [50, 50]
+}
+\`\`\`
+- Defines a regular polygon with a specific number of sides.
+
+### **6. Star**
+\`\`\`aqui
+shape star myStar {
+    outerRadius: 50
+    innerRadius: 20
+    points: 5
+    position: [50, 50]
+}
+\`\`\`
+- Defines a star with outer and inner radii and number of points.
+
+### **7. Arc**
+\`\`\`aqui
+shape arc myArc {
+    radius: 50
+    startAngle: 0
+    endAngle: 180
+    position: [50, 50]
+}
+\`\`\`
+- Defines an arc with a radius and start/end angles.
+
+### **8. Rounded Rectangle**
+\`\`\`aqui
+shape roundedRectangle myRoundRect {
+    width: 100
+    height: 50
+    radius: 10
+    position: [50, 50]
+}
+\`\`\`
+- Defines a rectangle with rounded corners.
+
+### **9. Path**
+\`\`\`aqui
+shape path myPath {
+    points: [
+        [0, 0],
+        [50, 50],
+        [100, 0]
+    ]
+}
+\`\`\`
+- Defines a custom path with multiple points.
+
+### **10. Arrow**
+\`\`\`aqui
+shape arrow myArrow {
+    length: 100
+    headWidth: 20
+    headLength: 30
+    position: [50, 50]
+}
+\`\`\`
+- Defines an arrow shape.
+
+### **11. Text**
+\`\`\`aqui
+shape text myText {
+    text: "Hello Aqui"
+    fontSize: 20
+    position: [50, 50]
+}
+\`\`\`
+- Defines a text shape.
+
+### **12. Bezier Curve**
+\`\`\`aqui
+shape bezier myBezier {
+    startPoint: [0, 0]
+    controlPoint1: [50, 100]
+    controlPoint2: [100, 100]
+    endPoint: [150, 0]
+}
+\`\`\`
+- Defines a cubic Bezier curve.
+
+### **13. Donut**
+\`\`\`aqui
+shape donut myDonut {
+    outerRadius: 50
+    innerRadius: 20
+    position: [50, 50]
+}
+\`\`\`
+- Defines a donut shape.
+
+### **14. Spiral**
+\`\`\`aqui
+shape spiral mySpiral {
+    startRadius: 10
+    endRadius: 50
+    turns: 5
+}
+\`\`\`
+- Defines a spiral shape.
+
+### **15. Cross**
+\`\`\`aqui
+shape cross myCross {
+    width: 50
+    thickness: 10
+}
+\`\`\`
+- Defines a cross shape.
+
+### **16. Gear**
+\`\`\`aqui
+shape gear myGear {
+    diameter: 100
+    teeth: 20
+    shaft: "square"
+}
+\`\`\`
+- Defines a gear with specific teeth and shaft shape.
+
+### **17. Wave**
+\`\`\`aqui
+shape wave myWave {
+    width: 100
+    amplitude: 20
+    frequency: 3
+}
+\`\`\`
+- Defines a sinusoidal wave shape.
+
+### **18. Slot**
+\`\`\`aqui
+shape slot mySlot {
+    length: 100
+    width: 20
+}
+\`\`\`
+- Defines a slot shape.
+
+### **19. Chamfer Rectangle**
+\`\`\`aqui
+shape chamferRectangle myChamfer {
+    width: 100
+    height: 50
+    chamfer: 10
+}
+\`\`\`
+- Defines a rectangle with chamfered corners.
+
+### **20. Polygon with Holes**
+\`\`\`aqui
+shape polygonWithHoles myPoly {
+    outerPoints: [[0, 0], [100, 0], [100, 100], [0, 100]]
+    holes: [[[30, 30], [70, 30], [70, 70], [30, 70]]]
+}
+\`\`\`
+- Defines a polygon with internal holes.
+
+---
+This documentation provides an in-depth guide on using Aqui for shape creation and graphical programming.`;
+
+    // Render markdown when the docs tab is shown
+    document.querySelector('.tab-btn[data-tab="docs-tab"]').addEventListener('click', () => {
+      const markdownContent = document.getElementById('markdown-content');
+      if (!markdownContent.innerHTML) {
+        markdownContent.innerHTML = marked.parse(documentationMarkdown);
+      }
+    });
+
+    // Event listeners
+    runButton.addEventListener('click', runCode);
+    viewAstButton.addEventListener('click', () => showPanel(astPanel));
+    viewErrorsButton.addEventListener('click', () => showPanel(errorPanel));
+    exportSvgButton.addEventListener('click', exportToSVG);
+
+    editor.on("keydown", (cm, event) => {
+      if (event.shiftKey && event.key === "Enter") {
+        event.preventDefault();
+        runCode();
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      renderer.setupCanvas();
+      runCode();
+    });
+
+    // Initial run
+    runCode();
+  </script>
+</body>
+</html>
