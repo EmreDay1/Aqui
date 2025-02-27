@@ -1,4 +1,4 @@
-// parser.mjs
+// parser.mjs with draw command support
 import { Token } from './lexer.mjs';
 
 export class Parser {
@@ -21,7 +21,93 @@ export class Parser {
     }
   }
 
-  // New method for parsing conditional expressions
+  // New method to parse draw statements
+  parseDrawStatement() {
+    this.eat('DRAW');
+    const name = this.currentToken.value;
+    this.eat('IDENTIFIER');
+    
+    this.eat('LBRACE');
+    const commands = [];
+    
+    while (this.currentToken.type !== 'RBRACE' && this.currentToken.type !== 'EOF') {
+      commands.push(this.parseDrawCommand());
+    }
+    
+    this.eat('RBRACE');
+    
+    return {
+      type: 'draw',
+      name,
+      commands
+    };
+  }
+  
+  // Method to parse individual draw commands
+  parseDrawCommand() {
+    const token = this.currentToken;
+    
+    switch (token.type) {
+      case 'FORWARD':
+        this.eat('FORWARD');
+        return {
+          type: 'draw_command',
+          command: 'forward',
+          value: this.parseExpression()
+        };
+        
+      case 'BACKWARD':
+        this.eat('BACKWARD');
+        return {
+          type: 'draw_command',
+          command: 'backward',
+          value: this.parseExpression()
+        };
+        
+      case 'RIGHT':
+        this.eat('RIGHT');
+        return {
+          type: 'draw_command',
+          command: 'right',
+          value: this.parseExpression()
+        };
+        
+      case 'LEFT':
+        this.eat('LEFT');
+        return {
+          type: 'draw_command',
+          command: 'left',
+          value: this.parseExpression()
+        };
+        
+      case 'GOTO':
+        this.eat('GOTO');
+        return {
+          type: 'draw_command',
+          command: 'goto',
+          value: this.parseExpression()
+        };
+        
+      case 'PENUP':
+        this.eat('PENUP');
+        return {
+          type: 'draw_command',
+          command: 'penup'
+        };
+        
+      case 'PENDOWN':
+        this.eat('PENDOWN');
+        return {
+          type: 'draw_command',
+          command: 'pendown'
+        };
+        
+      default:
+        this.error(`Unknown draw command: ${token.type}`);
+    }
+  }
+
+  // Parse conditional expressions
   parseCondition() {
     let expr = this.parseLogicalOr();
     return expr;
@@ -133,6 +219,12 @@ export class Parser {
     if (token.type === 'IDENTIFIER' || token.type === 'POSITION') {
       const name = token.value;
       this.eat(token.type);
+      
+      // Check if this is a function call
+      if (this.currentToken.type === 'LPAREN') {
+        return this.parseFunctionCall(name);
+      }
+      
       if (this.currentToken.type === 'DOT') {
         this.eat('DOT');
         const prop = this.currentToken.value;
@@ -165,7 +257,73 @@ export class Parser {
     this.error(`Unexpected token in factor: ${token.type}`);
   }
 
-  // New method for parsing if statements
+  // New method for parsing function definitions
+  parseFunctionDefinition() {
+    this.eat('DEF');
+    const functionName = this.currentToken.value;
+    this.eat('IDENTIFIER');
+    
+    // Parse parameters
+    this.eat('LPAREN');
+    const parameters = [];
+    if (this.currentToken.type !== 'RPAREN') {
+      parameters.push(this.currentToken.value);
+      this.eat('IDENTIFIER');
+      
+      while (this.currentToken.type === 'COMMA') {
+        this.eat('COMMA');
+        parameters.push(this.currentToken.value);
+        this.eat('IDENTIFIER');
+      }
+    }
+    this.eat('RPAREN');
+    
+    // Parse function body
+    this.eat('LBRACE');
+    const body = [];
+    while (this.currentToken.type !== 'RBRACE' && this.currentToken.type !== 'EOF') {
+      if (this.currentToken.type === 'RETURN') {
+        this.eat('RETURN');
+        const returnValue = this.parseExpression();
+        body.push({ type: 'return', value: returnValue });
+      } else {
+        body.push(this.parseStatement());
+      }
+    }
+    this.eat('RBRACE');
+    
+    return {
+      type: 'function_definition',
+      name: functionName,
+      parameters,
+      body
+    };
+  }
+
+  // New method for parsing function calls
+  parseFunctionCall(functionName) {
+    this.eat('LPAREN');
+    const args = [];
+    
+    if (this.currentToken.type !== 'RPAREN') {
+      args.push(this.parseExpression());
+      
+      while (this.currentToken.type === 'COMMA') {
+        this.eat('COMMA');
+        args.push(this.parseExpression());
+      }
+    }
+    
+    this.eat('RPAREN');
+    
+    return {
+      type: 'function_call',
+      name: functionName,
+      arguments: args
+    };
+  }
+
+  // Parse if statements
   parseIfStatement() {
     this.eat('IF');
     const condition = this.parseCondition();
@@ -194,6 +352,7 @@ export class Parser {
       elseBranch
     };
   }
+  
   parseStringLiteral() {
     let result = '';
     let t = this.lexer.getNextToken();
@@ -221,6 +380,7 @@ export class Parser {
     this.eat('RBRACKET');
     return { type: 'array', elements };
   }
+  
   parseParam() {
     this.eat('PARAM');
     const name = this.currentToken.value;
@@ -319,7 +479,7 @@ export class Parser {
         name: name,
         shapes: shapes
     };
-}
+  }
 
 
   parseTransform() {
@@ -388,11 +548,27 @@ export class Parser {
           angle: this.parseExpression()
         };
         break;
-        case 'UNION':
-        case 'DIFFERENCE':
-        case 'INTERSECTION':
-              statement = this.parseBooleanOperation();
-              break;
+      case 'UNION':
+      case 'DIFFERENCE':
+      case 'INTERSECTION':
+        statement = this.parseBooleanOperation();
+        break;
+      case 'DEF':
+        statement = this.parseFunctionDefinition();
+        break;
+      case 'DRAW':
+        statement = this.parseDrawStatement();
+        break;
+      case 'IDENTIFIER':
+        // Check if this is a function call
+        const name = this.currentToken.value;
+        this.eat('IDENTIFIER');
+        if (this.currentToken.type === 'LPAREN') {
+          statement = this.parseFunctionCall(name);
+        } else {
+          this.error(`Unexpected identifier: ${name}`);
+        }
+        break;
       default:
         this.error(`Unexpected token: ${this.currentToken.type}`);
     }
