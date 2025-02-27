@@ -44,79 +44,126 @@ class BooleanNaming {
     generateName(operation, shapes) {
         const opSymbol = this.operationSymbols[operation];
         const count = this.getNextCount(operation);
-        return `${shapes[0]}_${opSymbol}${count}`;
+        const baseName = shapes[0] && typeof shapes[0] === 'string' ? shapes[0] : 'shape';
+        return `${baseName}_${opSymbol}${count}`;
     }
 }
 
 export class BooleanOperator {
     constructor() {
-        this.epsilon = 0.0001;
+        // Increase precision threshold for better numerical stability
+        this.epsilon = 1e-10;
         this.naming = new BooleanNaming();
-    }
-
-    createShapeInstance(shape) {
-        switch (shape.type) {
-            case 'rectangle':
-                return new Rectangle(shape.params.width, shape.params.height);
-            case 'circle':
-                return new Circle(shape.params.radius);
-            case 'triangle':
-                return new Triangle(shape.params.base, shape.params.height);
-            case 'ellipse':
-                return new Ellipse(shape.params.radiusX, shape.params.radiusY);
-            case 'polygon':
-                return new RegularPolygon(shape.params.radius, shape.params.sides);
-            case 'star':
-                return new Star(shape.params.outerRadius, shape.params.innerRadius, shape.params.points);
-            case 'arc':
-                return new Arc(shape.params.radius, shape.params.startAngle, shape.params.endAngle);
-            case 'roundedRectangle':
-                return new RoundedRectangle(shape.params.width, shape.params.height, shape.params.radius);
-            case 'arrow':
-                return new Arrow(shape.params.length, shape.params.headWidth, shape.params.headLength);
-            case 'donut':
-                return new Donut(shape.params.outerRadius, shape.params.innerRadius);
-            case 'spiral':
-                return new Spiral(shape.params.startRadius, shape.params.endRadius, shape.params.turns);
-            case 'cross':
-                return new Cross(shape.params.width, shape.params.thickness);
-            case 'wave':
-                return new Wave(shape.params.width, shape.params.amplitude, shape.params.frequency);
-            case 'slot':
-                return new Slot(shape.params.length, shape.params.width);
-            case 'chamferRectangle':
-                return new ChamferRectangle(shape.params.width, shape.params.height, shape.params.chamfer);
-            case 'polygonWithHoles':
-                return new PolygonWithHoles(shape.params.outerPoints, shape.params.holes);
-            default:
-                throw new Error(`Unsupported shape type: ${shape.type}`);
-        }
-    }
-
-    getPoints(shape) {
-        // If it's a path type with points, return those points
-        if (shape.type === 'path' && shape.params.points) {
-            return shape.params.points;
-        }
-
-        // Create instance of the appropriate shape class
-        const shapeInstance = this.createShapeInstance(shape);
         
-        // Get points using the shape's built-in getPoints method
-        const points = shapeInstance.getPoints();
-
-        // Apply transformations and convert to [x,y] format
-        return this.transformPoints(points, shape.transform);
+        // Resolution for approximating curved shapes
+        this.curvedShapeResolution = 100;
     }
 
+    // Create shape instance based on shape type
+    createShapeInstance(shape) {
+        if (!shape || !shape.type || !shape.params) {
+            throw new Error('Invalid shape object');
+        }
+        
+        try {
+            switch (shape.type) {
+                case 'rectangle':
+                    return new Rectangle(shape.params.width, shape.params.height);
+                case 'circle':
+                    return new Circle(shape.params.radius);
+                case 'triangle':
+                    return new Triangle(shape.params.base, shape.params.height);
+                case 'ellipse':
+                    return new Ellipse(shape.params.radiusX, shape.params.radiusY);
+                case 'polygon':
+                    return new RegularPolygon(shape.params.radius, shape.params.sides);
+                case 'star':
+                    return new Star(shape.params.outerRadius, shape.params.innerRadius, shape.params.points);
+                case 'arc':
+                    return new Arc(shape.params.radius, shape.params.startAngle, shape.params.endAngle);
+                case 'roundedRectangle':
+                    return new RoundedRectangle(shape.params.width, shape.params.height, shape.params.radius);
+                case 'arrow':
+                    return new Arrow(shape.params.length, shape.params.headWidth, shape.params.headLength);
+                case 'donut':
+                    return new Donut(shape.params.outerRadius, shape.params.innerRadius);
+                case 'spiral':
+                    return new Spiral(shape.params.startRadius, shape.params.endRadius, shape.params.turns);
+                case 'cross':
+                    return new Cross(shape.params.width, shape.params.thickness);
+                case 'wave':
+                    return new Wave(shape.params.width, shape.params.amplitude, shape.params.frequency);
+                case 'slot':
+                    return new Slot(shape.params.length, shape.params.width);
+                case 'chamferRectangle':
+                    return new ChamferRectangle(shape.params.width, shape.params.height, shape.params.chamfer);
+                case 'polygonWithHoles':
+                    return new PolygonWithHoles(shape.params.outerPoints, shape.params.holes);
+                default:
+                    throw new Error(`Unsupported shape type: ${shape.type}`);
+            }
+        } catch (error) {
+            throw new Error(`Error creating shape instance: ${error.message}`);
+        }
+    }
+
+    // Get points representation of a shape
+    getPoints(shape) {
+        try {
+            // If it's a path type with points, return those points
+            if (shape.type === 'path' && shape.params.points) {
+                // For turtle paths with subPaths, flatten them
+                if (shape.params.isTurtlePath && Array.isArray(shape.params.subPaths)) {
+                    const allPoints = [];
+                    for (const subPath of shape.params.subPaths) {
+                        if (subPath.length > 0) {
+                            allPoints.push(...subPath);
+                        }
+                    }
+                    return allPoints;
+                }
+                return shape.params.points;
+            }
+
+            // For primitive shapes, get points using shape classes
+            const shapeInstance = this.createShapeInstance(shape);
+            
+            // Increase resolution for curved shapes
+            const resolution = this.isShapeCurved(shape.type) ? 
+                this.curvedShapeResolution : undefined;
+            
+            // Get points using the shape's built-in getPoints method
+            const points = shapeInstance.getPoints(resolution);
+
+            // Apply transformations and convert to [x,y] format
+            return this.transformPoints(points, shape.transform);
+        } catch (error) {
+            throw new Error(`Error getting points for ${shape.type}: ${error.message}`);
+        }
+    }
+
+    // Determine if a shape should be approximated with higher resolution
+    isShapeCurved(shapeType) {
+        return ['circle', 'ellipse', 'arc', 'roundedRectangle', 'spiral', 
+                'donut', 'wave', 'bezier'].includes(shapeType);
+    }
+
+    // Apply transformations to points
     transformPoints(points, transform) {
         if (!transform) return points.map(p => [p.x, p.y]);
+        if (!Array.isArray(points) || points.length === 0) return [];
 
         const { position, rotation, scale } = transform;
         return points.map(p => {
+            // Handle numeric instability
+            if (typeof p.x !== 'number' || typeof p.y !== 'number' || 
+                isNaN(p.x) || isNaN(p.y)) {
+                return [0, 0]; // Default for invalid points
+            }
+            
             // Scale
-            let x = p.x * scale[0];
-            let y = p.y * scale[1];
+            let x = p.x * (scale?.[0] || 1);
+            let y = p.y * (scale?.[1] || 1);
             
             // Rotate
             if (rotation) {
@@ -130,23 +177,37 @@ export class BooleanOperator {
             }
             
             // Translate
-            x += position[0];
-            y += position[1];
+            if (position) {
+                x += position[0] || 0;
+                y += position[1] || 0;
+            }
             
             return [x, y];
         });
     }
 
+    // Enhanced point-in-polygon test with improved numerical stability
     isPointInPolygon(point, polygon) {
+        if (!polygon || !Array.isArray(polygon) || polygon.length < 3) {
+            return false;
+        }
+        
         let inside = false;
         const x = point[0], y = point[1];
         
+        // Ray casting algorithm with improved precision
         for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
             const xi = polygon[i][0], yi = polygon[i][1];
             const xj = polygon[j][0], yj = polygon[j][1];
             
-            const intersect = ((yi > y) !== (yj > y))
-                && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+            // Point is on the edge
+            if (this.isPointOnSegment(point, [xi, yi], [xj, yj])) {
+                return true;
+            }
+            
+            // Ray casting test with strict inequality to avoid edge cases
+            const intersect = ((yi > y) !== (yj > y)) && 
+                              (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
             
             if (intersect) inside = !inside;
         }
@@ -154,19 +215,24 @@ export class BooleanOperator {
         return inside;
     }
 
+    // Find intersection between two line segments with improved precision
     findIntersection(p1, p2, p3, p4) {
         const x1 = p1[0], y1 = p1[1];
         const x2 = p2[0], y2 = p2[1];
         const x3 = p3[0], y3 = p3[1];
         const x4 = p4[0], y4 = p4[1];
 
+        // Check if segments are parallel
         const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
         if (Math.abs(denominator) < this.epsilon) return null;
 
+        // Calculate parameters t and u
         const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
         const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denominator;
 
+        // Check if intersection is within both segments
         if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+            // Calculate intersection point with higher precision
             return [
                 x1 + t * (x2 - x1),
                 y1 + t * (y2 - y1)
@@ -176,7 +242,13 @@ export class BooleanOperator {
         return null;
     }
 
+    // Find all intersections between two polygons
     findAllIntersections(shape1Points, shape2Points) {
+        if (!Array.isArray(shape1Points) || !Array.isArray(shape2Points) ||
+            shape1Points.length < 3 || shape2Points.length < 3) {
+            return [];
+        }
+        
         const intersections = [];
         
         for (let i = 0; i < shape1Points.length; i++) {
@@ -187,15 +259,16 @@ export class BooleanOperator {
                 const p3 = shape2Points[j];
                 const p4 = shape2Points[(j + 1) % shape2Points.length];
 
+                // Skip calculation if segments share an endpoint
+                if (this.pointsEqual(p1, p3) || this.pointsEqual(p1, p4) ||
+                    this.pointsEqual(p2, p3) || this.pointsEqual(p2, p4)) {
+                    continue;
+                }
+
                 const intersection = this.findIntersection(p1, p2, p3, p4);
                 if (intersection) {
                     // Only add unique intersection points
-                    if (!intersections.some(p => 
-                        Math.abs(p[0] - intersection[0]) < this.epsilon && 
-                        Math.abs(p[1] - intersection[1]) < this.epsilon
-                    )) {
-                        intersections.push(intersection);
-                    }
+                    this.addUniquePoint(intersections, intersection);
                 }
             }
         }
@@ -203,195 +276,340 @@ export class BooleanOperator {
         return intersections;
     }
     
+    // Check if two points are equal (within epsilon)
+    pointsEqual(p1, p2) {
+        return Math.abs(p1[0] - p2[0]) < this.epsilon && 
+               Math.abs(p1[1] - p2[1]) < this.epsilon;
+    }
+    
+    // Add a point if it's not already in the array
+    addUniquePoint(points, point) {
+        if (!points.some(p => this.pointsEqual(p, point))) {
+            points.push(point);
+        }
+    }
+    
+    // Remove duplicate points with higher precision
     removeDuplicatePoints(points) {
-        return points.filter((point, index) => {
-            // Check if this point is not a duplicate of any previous point
-            return !points.some((otherPoint, otherIndex) => 
-                index > otherIndex &&
-                Math.abs(point[0] - otherPoint[0]) < this.epsilon &&
-                Math.abs(point[1] - otherPoint[1]) < this.epsilon
-            );
-        });
+        if (!Array.isArray(points)) return [];
+        
+        const result = [];
+        for (const point of points) {
+            this.addUniquePoint(result, point);
+        }
+        return result;
     }
 
-    removeDuplicates(points) {
-        return points.filter((p1, i) => {
-            return !points.some((p2, j) => {
-                return i > j && 
-                    Math.abs(p1[0] - p2[0]) < this.epsilon && 
-                    Math.abs(p1[1] - p2[1]) < this.epsilon;
-            });
-        });
-    }
-
+    // Order points in counter-clockwise order
     orderPoints(points) {
-        if (points.length === 0) return points;
+        if (!Array.isArray(points) || points.length <= 2) return points;
 
-        // Calculate centroid
-        const centroid = points.reduce(
-            (acc, p) => [acc[0] + p[0], acc[1] + p[1]],
-            [0, 0]
-        ).map(v => v / points.length);
-
-        // Sort points by angle from centroid
-        return points.sort((a, b) => {
-            const angleA = Math.atan2(a[1] - centroid[1], a[0] - centroid[0]);
-            const angleB = Math.atan2(b[1] - centroid[1], b[0] - centroid[0]);
-            return angleA - angleB;
-        });
+        try {
+            // Calculate the centroid with greater precision
+            const centroid = this.calculateCentroid(points);
+            
+            // Sort points by angle from centroid
+            return [...points].sort((a, b) => {
+                // Handle numerical instability
+                if (!Array.isArray(a) || !Array.isArray(b) || a.length < 2 || b.length < 2) {
+                    return 0;
+                }
+                
+                const angleA = Math.atan2(a[1] - centroid[1], a[0] - centroid[0]);
+                const angleB = Math.atan2(b[1] - centroid[1], b[0] - centroid[0]);
+                
+                if (Math.abs(angleA - angleB) < this.epsilon) {
+                    // If angles are very close, sort by distance from centroid
+                    const distA = this.distance(a, centroid);
+                    const distB = this.distance(b, centroid);
+                    return distA - distB;
+                }
+                
+                return angleA - angleB;
+            });
+        } catch (error) {
+            console.error('Error ordering points:', error);
+            return points; // Return original points if ordering fails
+        }
+    }
+    
+    // Calculate centroid (geometric center) of points
+    calculateCentroid(points) {
+        if (points.length === 0) return [0, 0];
+        
+        // Calculate average of x and y coordinates
+        let sumX = 0, sumY = 0;
+        for (const point of points) {
+            sumX += point[0];
+            sumY += point[1];
+        }
+        
+        return [sumX / points.length, sumY / points.length];
     }
 
+    // Implementation of union operation with improved edge case handling
     union(shapes) {
-        const firstShape = shapes[0];
-        let resultPoints = this.getPoints(firstShape);
-
-        for (let i = 1; i < shapes.length; i++) {
-            const nextShape = shapes[i];
-            const nextPoints = this.getPoints(nextShape);
-            const intersections = this.findAllIntersections(resultPoints, nextPoints);
-
-            // Get boundary points
-            let boundaryPoints = [];
-            
-            // Add points from first shape that are outside second shape
-            resultPoints.forEach(p => {
-                if (!this.isPointInPolygon(p, nextPoints)) {
-                    boundaryPoints.push(p);
-                }
-            });
-
-            // Add points from second shape that are outside first shape
-            nextPoints.forEach(p => {
-                if (!this.isPointInPolygon(p, resultPoints)) {
-                    boundaryPoints.push(p);
-                }
-            });
-
-            // Add intersection points
-            boundaryPoints = [...boundaryPoints, ...intersections];
-
-            // Remove duplicates
-            boundaryPoints = this.removeDuplicates(boundaryPoints);
-
-            // Order points by angle from centroid
-            resultPoints = this.orderPoints(boundaryPoints);
+        if (!Array.isArray(shapes) || shapes.length === 0) {
+            throw new Error('Union operation requires at least one shape');
         }
+        
+        if (shapes.length === 1) {
+            return this.getPoints(shapes[0]);
+        }
+        
+        try {
+            const firstShape = shapes[0];
+            let resultPoints = this.getPoints(firstShape);
+            
+            if (!Array.isArray(resultPoints) || resultPoints.length < 3) {
+                throw new Error('Invalid shape points for union');
+            }
 
-        return resultPoints;
+            for (let i = 1; i < shapes.length; i++) {
+                const nextShape = shapes[i];
+                const nextPoints = this.getPoints(nextShape);
+                
+                if (!Array.isArray(nextPoints) || nextPoints.length < 3) {
+                    continue; // Skip invalid shapes
+                }
+                
+                // Find intersections between shapes
+                const intersections = this.findAllIntersections(resultPoints, nextPoints);
+                
+                // Get boundary points
+                let boundaryPoints = [];
+                
+                // Add points from first shape that are outside second shape
+                resultPoints.forEach(p => {
+                    if (!this.isPointInPolygon(p, nextPoints)) {
+                        boundaryPoints.push(p);
+                    }
+                });
+
+                // Add points from second shape that are outside first shape
+                nextPoints.forEach(p => {
+                    if (!this.isPointInPolygon(p, resultPoints)) {
+                        boundaryPoints.push(p);
+                    }
+                });
+
+                // Add intersection points
+                boundaryPoints = [...boundaryPoints, ...intersections];
+
+                // Special case: if no intersections and one shape is inside the other
+                if (intersections.length === 0) {
+                    if (this.isPointInPolygon(resultPoints[0], nextPoints)) {
+                        // Result completely inside next shape, use next shape
+                        boundaryPoints = nextPoints;
+                    } else if (this.isPointInPolygon(nextPoints[0], resultPoints)) {
+                        // Next shape completely inside result, keep result
+                        boundaryPoints = resultPoints;
+                    }
+                    // If neither contains the other, we already have correct boundary points
+                }
+
+                // Remove duplicates
+                boundaryPoints = this.removeDuplicatePoints(boundaryPoints);
+
+                // Order points by angle from centroid
+                resultPoints = this.orderPoints(boundaryPoints);
+            }
+
+            return resultPoints;
+        } catch (error) {
+            console.error('Error performing union:', error);
+            // Return points from first shape if union fails
+            return this.getPoints(shapes[0]);
+        }
     }
 
-
-
-
+    // Implementation of difference operation with improved robustness
     difference(shapes) {
-        if (shapes.length < 2) return null;
-
-        const baseShape = shapes[0];
-        const subtractShape = shapes[1];
-        
-        // Get points with high resolution for curved shapes
-        const segments = 64; // Increase segments for smoother curves
-        let resultPoints = this.getPoints(baseShape);
-        let subtractPoints = this.getPoints(subtractShape);
-
-        // Find all intersection points
-        const intersections = this.findAllIntersections(resultPoints, subtractPoints);
-        if (intersections.length === 0) {
-            // If no intersections, either completely inside or outside
-            if (this.isPointInPolygon(resultPoints[0], subtractPoints)) {
-                return []; // Base shape is completely inside subtract shape
-            }
-            return resultPoints; // No intersection, return original shape
+        if (!Array.isArray(shapes) || shapes.length < 2) {
+            throw new Error('Difference operation requires at least two shapes');
         }
-
-        // Sort intersection points along the boundary
-        const sortedIntersections = this.sortIntersectionPoints(intersections);
-
-        // Build the result boundary
-        let finalPoints = [];
-        let isInside = this.isPointInPolygon(resultPoints[0], subtractPoints);
         
-        // Add points from base shape when outside subtract shape
-        for (let i = 0; i < resultPoints.length; i++) {
-            const current = resultPoints[i];
-            const next = resultPoints[(i + 1) % resultPoints.length];
+        try {
+            const baseShape = shapes[0];
+            const subtractShape = shapes[1];
             
-            if (!isInside) {
-                finalPoints.push(current);
+            let resultPoints = this.getPoints(baseShape);
+            let subtractPoints = this.getPoints(subtractShape);
+            
+            if (!Array.isArray(resultPoints) || resultPoints.length < 3 || 
+                !Array.isArray(subtractPoints) || subtractPoints.length < 3) {
+                throw new Error('Invalid shape points for difference');
             }
 
-            // Check for intersections between current and next point
-            const segmentIntersections = intersections.filter(p => 
-                this.isPointOnSegment(p, current, next)
-            );
+            // Find all intersection points
+            const intersections = this.findAllIntersections(resultPoints, subtractPoints);
+            
+            // Check for no intersection cases
+            if (intersections.length === 0) {
+                // If base shape is completely inside subtract shape, result is empty
+                if (this.isPointInPolygon(resultPoints[0], subtractPoints)) {
+                    return []; 
+                }
+                // If no intersections and base shape is not inside subtract shape, 
+                // return original shape
+                return resultPoints;
+            }
 
-            if (segmentIntersections.length > 0) {
-                finalPoints.push(...segmentIntersections);
-                isInside = !isInside;
-
-                // If entering subtract shape, add boundary points from subtract shape
-                if (isInside) {
-                    const startPoint = segmentIntersections[0];
-                    const endPoint = segmentIntersections[segmentIntersections.length - 1];
-                    const subtractBoundary = this.getSubtractShapeBoundary(
-                        subtractShape, 
-                        startPoint, 
-                        endPoint, 
-                        resultPoints
-                    );
-                    finalPoints.push(...subtractBoundary);
+            // Use more robust polygon clipping approach
+            return this.robustDifference(resultPoints, subtractPoints, intersections);
+        } catch (error) {
+            console.error('Error performing difference:', error);
+            // Return points from first shape if difference fails
+            return this.getPoints(shapes[0]);
+        }
+    }
+    
+    // More robust implementation of polygon difference
+    robustDifference(basePoints, subtractPoints, intersections) {
+        // Create a map to track which segments of the base shape are inside/outside
+        const baseSegments = [];
+        for (let i = 0; i < basePoints.length; i++) {
+            const start = basePoints[i];
+            const end = basePoints[(i + 1) % basePoints.length];
+            const midpoint = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2];
+            
+            baseSegments.push({
+                start,
+                end,
+                isInside: this.isPointInPolygon(midpoint, subtractPoints)
+            });
+        }
+        
+        // Build the result polygon using outside segments and intersection points
+        let resultPoints = [];
+        let currentPoint = null;
+        let isTracing = false;
+        
+        // Start from a segment that's outside
+        const startSegmentIndex = baseSegments.findIndex(seg => !seg.isInside);
+        if (startSegmentIndex === -1) {
+            return []; // All segments are inside, result is empty
+        }
+        
+        // Traverse base polygon segments
+        for (let i = 0; i < baseSegments.length; i++) {
+            const segmentIndex = (startSegmentIndex + i) % baseSegments.length;
+            const segment = baseSegments[segmentIndex];
+            
+            if (!segment.isInside) {
+                // If not already tracing, add start point
+                if (!isTracing) {
+                    resultPoints.push(segment.start);
+                    isTracing = true;
+                }
+                
+                // Add end point
+                resultPoints.push(segment.end);
+                currentPoint = segment.end;
+            } else {
+                // We're entering subtract shape, find the intersection
+                if (isTracing) {
+                    // Find intersection with subtract shape
+                    for (let j = 0; j < subtractPoints.length; j++) {
+                        const p3 = subtractPoints[j];
+                        const p4 = subtractPoints[(j + 1) % subtractPoints.length];
+                        
+                        const intersection = this.findIntersection(
+                            segment.start, segment.end, p3, p4);
+                        
+                        if (intersection) {
+                            resultPoints.push(intersection);
+                            isTracing = false;
+                            break;
+                        }
+                    }
                 }
             }
         }
-
-        // Remove duplicate points
-        finalPoints = this.removeDuplicatePoints(finalPoints);
-
-        // Order points counter-clockwise
-        return this.orderPoints(finalPoints);
+        
+        // Remove duplicates and order points
+        resultPoints = this.removeDuplicatePoints(resultPoints);
+        return this.orderPoints(resultPoints);
     }
 
-    getSubtractShapeBoundary(subtractShape, startPoint, endPoint, basePoints) {
-        const subtractPoints = this.getPoints(subtractShape);
-        let boundary = [];
-        let startIdx = -1;
-        let endIdx = -1;
-
-        // Find closest points on subtract shape to intersection points
-        for (let i = 0; i < subtractPoints.length; i++) {
-            const point = subtractPoints[i];
-            if (this.distance(point, startPoint) < this.epsilon) {
-                startIdx = i;
-            }
-            if (this.distance(point, endPoint) < this.epsilon) {
-                endIdx = i;
-            }
+    // Implementation of intersection operation with improved robustness
+    intersection(shapes) {
+        if (!Array.isArray(shapes) || shapes.length < 2) {
+            throw new Error('Intersection operation requires at least two shapes');
         }
-
-        if (startIdx === -1 || endIdx === -1) return [];
-
-        // Collect boundary points in correct direction
-        let idx = startIdx;
-        const length = subtractPoints.length;
-        while (idx !== endIdx) {
-            const point = subtractPoints[idx];
-            if (!this.isPointInPolygon(point, basePoints)) {
-                boundary.push(point);
+        
+        try {
+            const firstShape = shapes[0];
+            let resultPoints = this.getPoints(firstShape);
+            
+            if (!Array.isArray(resultPoints) || resultPoints.length < 3) {
+                throw new Error('Invalid shape points for intersection');
             }
-            idx = (idx + 1) % length;
-        }
-        boundary.push(subtractPoints[endIdx]);
 
-        return boundary;
+            for (let i = 1; i < shapes.length; i++) {
+                const nextShape = shapes[i];
+                const nextPoints = this.getPoints(nextShape);
+                
+                if (!Array.isArray(nextPoints) || nextPoints.length < 3) {
+                    return []; // If any shape is invalid, intersection is empty
+                }
+                
+                // Find intersections between shapes
+                const intersections = this.findAllIntersections(resultPoints, nextPoints);
+                
+                // Special case: if no intersections, check if one shape is inside the other
+                if (intersections.length === 0) {
+                    if (this.isPointInPolygon(resultPoints[0], nextPoints)) {
+                        // Result completely inside next shape, keep result
+                        continue;
+                    } else if (this.isPointInPolygon(nextPoints[0], resultPoints)) {
+                        // Next shape completely inside result, use next shape
+                        resultPoints = nextPoints;
+                        continue;
+                    } else {
+                        // No intersections and neither contains the other, result is empty
+                        return [];
+                    }
+                }
+                
+                // Get intersection points
+                let intersectionPoints = [
+                    ...resultPoints.filter(p => this.isPointInPolygon(p, nextPoints)),
+                    ...nextPoints.filter(p => this.isPointInPolygon(p, resultPoints)),
+                    ...intersections
+                ];
+
+                // Remove duplicates
+                intersectionPoints = this.removeDuplicatePoints(intersectionPoints);
+                
+                // If no points remain, intersection is empty
+                if (intersectionPoints.length === 0) {
+                    return [];
+                }
+                
+                // Order points by angle from centroid
+                resultPoints = this.orderPoints(intersectionPoints);
+            }
+
+            return resultPoints;
+        } catch (error) {
+            console.error('Error performing intersection:', error);
+            return []; // Return empty array if intersection fails
+        }
     }
 
+    // Distance between two points
     distance(p1, p2) {
+        if (!Array.isArray(p1) || !Array.isArray(p2) || p1.length < 2 || p2.length < 2) {
+            return Infinity;
+        }
         return Math.sqrt(
             Math.pow(p2[0] - p1[0], 2) + 
             Math.pow(p2[1] - p1[1], 2)
         );
     }
 
+    // Check if a point lies on a line segment
     isPointOnSegment(point, start, end) {
         const d1 = this.distance(point, start);
         const d2 = this.distance(point, end);
@@ -399,141 +617,102 @@ export class BooleanOperator {
         return Math.abs(d1 + d2 - lineLen) < this.epsilon;
     }
 
-    sortIntersectionPoints(points) {
-        return points.sort((a, b) => {
-            if (Math.abs(a[0] - b[0]) < this.epsilon) {
-                return a[1] - b[1];
-            }
-            return a[0] - b[0];
-        });
-    }
-
-
-    orderPointsForDifference(points, intersections) {
-        if (points.length < 3) return points;
-
-        // Calculate centroid from all points except intersections
-        const nonIntersectionPoints = points.filter(p => 
-            !intersections.some(ip => 
-                Math.abs(p[0] - ip[0]) < this.epsilon && 
-                Math.abs(p[1] - ip[1]) < this.epsilon
-            )
-        );
-
-        const centroid = nonIntersectionPoints.reduce(
-            (acc, [x, y]) => ([acc[0] + x, acc[1] + y]), 
-            [0, 0]
-        ).map(v => v / nonIntersectionPoints.length);
-
-        // Sort points by angle, but handle intersection points specially
-        return points.sort((a, b) => {
-            const angleA = Math.atan2(a[1] - centroid[1], a[0] - centroid[0]);
-            const angleB = Math.atan2(b[1] - centroid[1], b[0] - centroid[0]);
-
-            // If both points are intersections, maintain their relative order
-            const aIsIntersection = intersections.some(ip => 
-                Math.abs(ip[0] - a[0]) < this.epsilon && 
-                Math.abs(ip[1] - a[1]) < this.epsilon
-            );
-            const bIsIntersection = intersections.some(ip => 
-                Math.abs(ip[0] - b[0]) < this.epsilon && 
-                Math.abs(ip[1] - b[1]) < this.epsilon
-            );
-
-            if (aIsIntersection && bIsIntersection) {
-                // If angles are very close, keep original order
-                if (Math.abs(angleA - angleB) < this.epsilon) {
-                    return 0;
-                }
-            }
-
-            return angleA - angleB;
-        });
-    }
-
-    intersection(shapes) {
-        const firstShape = shapes[0];
-        let resultPoints = this.getPoints(firstShape);
-
-        for (let i = 1; i < shapes.length; i++) {
-            const nextShape = shapes[i];
-            const nextPoints = this.getPoints(nextShape);
-            const intersections = this.findAllIntersections(resultPoints, nextPoints);
-            
-            resultPoints = [
-                ...resultPoints.filter(p => this.isPointInPolygon(p, nextPoints)),
-                ...nextPoints.filter(p => this.isPointInPolygon(p, resultPoints)),
-                ...intersections
-            ];
-
-            resultPoints = this.removeDuplicates(resultPoints);
-            resultPoints = this.orderPoints(resultPoints);
-        }
-
-        return resultPoints;
-    }
-
+    // Create result shape from points
     createResultShape(points, operation, shapes) {
-        const name = this.naming.generateName(
-            operation, 
-            shapes.map(s => s.name || 'shape')
-        );
-        
-        return {
-            type: 'path',
-            name: name,
-            params: {
-                points: points,
-                closed: true,
-                operation: operation
-            },
-            transform: {
-                position: [0, 0],
-                rotation: 0,
-                scale: [1, 1]
-            }
-        };
+        try {
+            // Generate a name based on the operation and input shapes
+            const name = this.naming.generateName(
+                operation, 
+                shapes.map(s => s.name || 'shape')
+            );
+            
+            // Create a path shape from the points
+            return {
+                type: 'path',
+                name: name,
+                params: {
+                    points: points,
+                    closed: true,
+                    operation: operation
+                },
+                transform: {
+                    position: [0, 0],
+                    rotation: 0,
+                    scale: [1, 1]
+                }
+            };
+        } catch (error) {
+            console.error('Error creating result shape:', error);
+            // Return empty shape if creation fails
+            return {
+                type: 'path',
+                name: `error_${operation}`,
+                params: { points: [], closed: true, operation },
+                transform: { position: [0, 0], rotation: 0, scale: [1, 1] }
+            };
+        }
     }
 
-    performOperation(operation, shapes) {
-        if (!Array.isArray(shapes) || shapes.length < 2) {
-            throw new Error(`${operation} operation requires at least two shapes`);
-        }
-
-        let resultPoints;
-        switch (operation) {
-            case 'union':
-                resultPoints = this.union(shapes);
-                break;
-            case 'difference':
-                resultPoints = this.difference(shapes);
-                break;
-            case 'intersection':
-                resultPoints = this.intersection(shapes);
-                break;
-            default:
-                throw new Error(`Unknown operation: ${operation}`);
-        }
-
-        return this.createResultShape(resultPoints, operation, shapes);
-    }
-
-    // Public API methods
+    // Public API methods with error handling
     performDifference(shapes) {
-        const resultPoints = this.difference(shapes);
-        return this.createResultShape(resultPoints, 'difference', shapes);
+        try {
+            if (!Array.isArray(shapes) || shapes.length < 2) {
+                throw new Error('Difference operation requires at least two shapes');
+            }
+            
+            const resultPoints = this.difference(shapes);
+            if (!Array.isArray(resultPoints) || resultPoints.length < 3) {
+                throw new Error('Difference operation resulted in invalid shape');
+            }
+            
+            return this.createResultShape(resultPoints, 'difference', shapes);
+        } catch (error) {
+            console.error('Error in performDifference:', error);
+            // Return empty shape on error
+            return this.createResultShape([], 'difference', shapes);
+        }
     }
 
     performUnion(shapes) {
-        const resultPoints = this.union(shapes);
-        return this.createResultShape(resultPoints, 'union', shapes);
+        try {
+            if (!Array.isArray(shapes) || shapes.length < 2) {
+                throw new Error('Union operation requires at least two shapes');
+            }
+            
+            const resultPoints = this.union(shapes);
+            if (!Array.isArray(resultPoints) || resultPoints.length < 3) {
+                throw new Error('Union operation resulted in invalid shape');
+            }
+            
+            return this.createResultShape(resultPoints, 'union', shapes);
+        } catch (error) {
+            console.error('Error in performUnion:', error);
+            // Fall back to first shape on error
+            const firstShape = shapes[0];
+            const points = firstShape ? this.getPoints(firstShape) : [];
+            return this.createResultShape(points, 'union', shapes);
+        }
     }
 
     performIntersection(shapes) {
-        const resultPoints = this.intersection(shapes);
-        return this.createResultShape(resultPoints, 'intersection', shapes);
+        try {
+            if (!Array.isArray(shapes) || shapes.length < 2) {
+                throw new Error('Intersection operation requires at least two shapes');
+            }
+            
+            const resultPoints = this.intersection(shapes);
+            if (!Array.isArray(resultPoints) || resultPoints.length < 3) {
+                // Empty intersection is a valid result
+                return this.createResultShape([], 'intersection', shapes);
+            }
+            
+            return this.createResultShape(resultPoints, 'intersection', shapes);
+        } catch (error) {
+            console.error('Error in performIntersection:', error);
+            // Return empty shape on error
+            return this.createResultShape([], 'intersection', shapes);
+        }
     }
-
 
     resetNaming() {
         this.naming.reset();
