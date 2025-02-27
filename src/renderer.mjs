@@ -48,57 +48,12 @@ export class Renderer {
   clear() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.drawBackground();
-    this.drawGrid();
-    this.drawAxes();
+    // Removed grid and axes drawing for blank canvas
   }
 
   drawBackground() {
     this.ctx.fillStyle = '#ffffff';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-  }
-
-  drawGrid() {
-    const gridSize = 50 * this.scale;
-    const numX = Math.ceil(this.canvas.width / gridSize);
-    const numY = Math.ceil(this.canvas.height / gridSize);
-
-    this.ctx.strokeStyle = '#e5e5e5';
-    this.ctx.lineWidth = 1;
-
-    // Vertical lines
-    for (let i = -numX; i <= numX; i++) {
-      const x = this.offsetX + i * gridSize;
-      this.ctx.beginPath();
-      this.ctx.moveTo(x, 0);
-      this.ctx.lineTo(x, this.canvas.height);
-      this.ctx.stroke();
-    }
-
-    // Horizontal lines
-    for (let i = -numY; i <= numY; i++) {
-      const y = this.offsetY + i * gridSize;
-      this.ctx.beginPath();
-      this.ctx.moveTo(0, y);
-      this.ctx.lineTo(this.canvas.width, y);
-      this.ctx.stroke();
-    }
-  }
-
-  drawAxes() {
-    this.ctx.strokeStyle = '#000000';
-    this.ctx.lineWidth = 2;
-
-    // X axis
-    this.ctx.beginPath();
-    this.ctx.moveTo(0, this.offsetY);
-    this.ctx.lineTo(this.canvas.width, this.offsetY);
-    this.ctx.stroke();
-
-    // Y axis
-    this.ctx.beginPath();
-    this.ctx.moveTo(this.offsetX, 0);
-    this.ctx.lineTo(this.offsetX, this.canvas.height);
-    this.ctx.stroke();
   }
 
   // Transform world coordinates to screen coordinates
@@ -109,7 +64,7 @@ export class Renderer {
   transformY(y) {
     return -y * this.scale + this.offsetY;
   }
-
+    
   // Main shape drawing method
   drawShape(shape) {
     const { type, params, transform } = shape;
@@ -130,7 +85,11 @@ export class Renderer {
         this.drawGear(params);
         break;
       case 'path':
-        this.drawPath(params);
+        if (params.isTurtlePath) {
+          this.drawTurtlePath(params);
+        } else {
+          this.drawPath(params);
+        }
         break;
       case 'bezier':
         this.drawBezier(params);
@@ -140,6 +99,30 @@ export class Renderer {
     }
 
     this.ctx.restore();
+  }
+
+  // Draw turtle paths
+  drawTurtlePath(params) {
+    if (!params.subPaths || params.subPaths.length === 0) return;
+    
+    this.ctx.strokeStyle = '#000000';
+    this.ctx.lineWidth = 2;
+    this.ctx.lineCap = 'round';
+    this.ctx.lineJoin = 'round';
+    
+    // Draw each subpath separately
+    for (const path of params.subPaths) {
+      if (path.length >= 2) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(path[0][0], path[0][1]);
+        
+        for (let i = 1; i < path.length; i++) {
+          this.ctx.lineTo(path[i][0], path[i][1]);
+        }
+        
+        this.ctx.stroke();
+      }
+    }
   }
 
   // Draw generic shape using Shape classes
@@ -228,15 +211,46 @@ export class Renderer {
 
     this.ctx.strokeStyle = '#000000';
     this.ctx.lineWidth = 2;
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
     
     this.ctx.beginPath();
     this.ctx.moveTo(points[0][0], points[0][1]);
     
     for (let i = 1; i < points.length; i++) {
-      this.ctx.lineTo(points[i][0], points[i][1]);
+        // For union operations, we can optionally smooth the path
+        if (params.isSmoothUnion && i > 1) {
+            const prev = points[i - 1];
+            const curr = points[i];
+            const next = points[(i + 1) % points.length];
+            
+            // Use quadratic curves for smoother transitions
+            const cp = this.getControlPoint(prev, curr, next);
+            this.ctx.quadraticCurveTo(curr[0], curr[1], cp[0], cp[1]);
+        } else {
+            this.ctx.lineTo(points[i][0], points[i][1]);
+        }
     }
     
+    this.ctx.closePath();
+    this.ctx.fill();
     this.ctx.stroke();
+  }
+
+  getControlPoint(p1, p2, p3) {
+    const dx1 = p2[0] - p1[0];
+    const dy1 = p2[1] - p1[1];
+    const dx2 = p3[0] - p2[0];
+    const dy2 = p3[1] - p2[1];
+    
+    const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+    const len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+    
+    const t = len1 / (len1 + len2);
+    
+    return [
+        p2[0] + t * (dx2 - dx1) * 0.25,
+        p2[1] + t * (dy2 - dy1) * 0.25
+    ];
   }
 
   // Draw bezier curve
