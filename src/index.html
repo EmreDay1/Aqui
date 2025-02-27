@@ -351,6 +351,9 @@
   </div>
 
   <script type="module">
+    // Import SVG export functionality
+    import { exportToSVG } from './svgExport.mjs';
+    
     let currentPanel = null;
     let interpreter;
 
@@ -400,10 +403,10 @@
     CodeMirror.defineSimpleMode("aqui", {
       start: [
         { regex: /\/\/.*/, token: "comment" },
-        { regex: /\b(param|shape|layer|transform|add|subtract|rotate|scale|position|isBezier|isHole)\b/, token: "keyword" },
+        { regex: /\b(param|shape|layer|transform|add|subtract|rotate|scale|position|isBezier|isHole|def|return|draw|forward|backward|right|left|goto|penup|pendown)\b/, token: "keyword" },
         { regex: /\b\d+(\.\d+)?\b/, token: "number" },
         { regex: /"(?:[^\\]|\\.)*?"/, token: "string" },
-        { regex: /[\{\}\[\]:,]/, token: "operator" }
+        { regex: /[\{\}\[\]:,()]/, token: "operator" }
       ]
     });
 
@@ -485,74 +488,25 @@
       }
     }
 
-    function exportToSVG() {
+    // SVG Export functionality using our new module
+    function handleSVGExport() {
       try {
-        if (!interpreter?.env?.shapes) {
-          throw new Error('No shapes to export');
-        }
-
-        const svgNS = "http://www.w3.org/2000/svg";
-        const svg = document.createElementNS(svgNS, "svg");
+        // Get filename from prompt with default value
+        const filename = prompt("Enter filename for SVG export:", "aqui_drawing.svg");
         
-        svg.setAttribute("xmlns", svgNS);
-        svg.setAttribute("width", canvas.width);
-        svg.setAttribute("height", canvas.height);
-        svg.setAttribute("viewBox", `0 0 ${canvas.width} ${canvas.height}`);
-
-        interpreter.env.shapes.forEach((shape) => {
-          const path = document.createElementNS(svgNS, "path");
-          let pathData = "";
-
-          if (shape.type === 'path') {
-            if (shape.params.isBezier) {
-              const pts = shape.params.points;
-              pathData = `M ${pts[0][0]} ${pts[0][1]} C ${pts[1][0]} ${pts[1][1]}, ${pts[2][0]} ${pts[2][1]}, ${pts[3][0]} ${pts[3][1]}`;
-              path.setAttribute("fill", "none");
-            } else {
-              const pts = shape.params.points;
-              pathData = `M ${pts[0][0]} ${pts[0][1]}`;
-              for (let i = 1; i < pts.length; i++) {
-                pathData += ` L ${pts[i][0]} ${pts[i][1]}`;
-              }
-              pathData += " Z";
-              path.setAttribute("fill", shape.params.isHole ? "white" : "rgba(0, 0, 0, 0.1)");
-            }
-          }
-
-          path.setAttribute("d", pathData);
-          path.setAttribute("stroke", "#000000");
-          path.setAttribute("stroke-width", "2");
-
-          // Apply transformations
-          const transform = shape.transform;
-          if (transform) {
-            const translateX = transform.position[0] || 0;
-            const translateY = transform.position[1] || 0;
-            const rotate = transform.rotation || 0;
-            const scaleX = transform.scale[0] || 1;
-            const scaleY = transform.scale[1] || 1;
-            
-            path.setAttribute("transform", 
-              `translate(${translateX} ${translateY}) rotate(${-rotate}) scale(${scaleX} ${scaleY})`
-            );
-          }
-
-          svg.appendChild(path);
-        });
-
-        // Create and trigger download
-        const serializer = new XMLSerializer();
-        const svgString = serializer.serializeToString(svg);
-        const blob = new Blob([svgString], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'shapes.svg';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
+        // If user cancels prompt, abort export
+        if (filename === null) return;
+        
+        // Ensure filename has .svg extension
+        const validFilename = filename.toLowerCase().endsWith('.svg') ? 
+          filename : `${filename}.svg`;
+        
+        // Call the export function with interpreter, canvas and filename
+        const result = exportToSVG(interpreter, canvas, validFilename);
+        
+        if (result !== true && result?.error) {
+          displayErrors([{ message: `SVG Export failed: ${result.error}` }]);
+        }
       } catch (error) {
         console.error('SVG Export error:', error);
         displayErrors([{ message: `SVG Export failed: ${error.message}` }]);
@@ -636,6 +590,42 @@ if param.size > 50 {
 \`\`\`
 - If \`size\` is greater than 50, \`bigCircle\` is created.
 - Otherwise, \`smallCircle\` is created.
+
+### **6. Functions (\`def\`)**
+Functions allow creating reusable code blocks for shape generation.
+#### **Syntax:**
+\`\`\`aqui
+def functionName(param1, param2) {
+    // Function body
+    shape circle myCircle {
+        radius: param1
+        position: [param2, param2]
+    }
+    return myCircle
+}
+
+// Call the function
+param circleInstance functionName(30, 50)
+\`\`\`
+- Define functions with the \`def\` keyword
+- Functions can accept parameters and return values
+- Use functions to create reusable shape generators
+
+### **7. Turtle Drawing (\`draw\`)**
+Create paths using turtle-like drawing commands.
+#### **Syntax:**
+\`\`\`aqui
+draw myDrawing {
+    forward 50
+    right 90
+    forward 50
+    
+    // More drawing commands
+}
+\`\`\`
+- Drawing commands: forward, backward, right, left, goto, penup, pendown
+- Similar to the turtle library in Python
+- Create complex paths procedurally
 
 ## Loops
 
@@ -942,7 +932,7 @@ This documentation provides an in-depth guide on using Aqui for shape creation a
     runButton.addEventListener('click', runCode);
     viewAstButton.addEventListener('click', () => showPanel(astPanel));
     viewErrorsButton.addEventListener('click', () => showPanel(errorPanel));
-    exportSvgButton.addEventListener('click', exportToSVG);
+    exportSvgButton.addEventListener('click', handleSVGExport);
 
     editor.on("keydown", (cm, event) => {
       if (event.shiftKey && event.key === "Enter") {
