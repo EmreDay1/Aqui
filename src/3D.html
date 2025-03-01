@@ -2,13 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AQUI 3D Test Page</title>
+  <title>3D AQUI</title>
   
-  <!-- Three.js for 3D rendering -->
+  <!-- CodeMirror Dependencies -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/mode/simple.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.12/addon/edit/closebrackets.min.js"></script>
+  
+  <!-- Three.js for 3D rendering - LOAD BEFORE MODULES -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-  
+
   <style>
     * {
       margin: 0;
@@ -17,43 +22,91 @@
     }
 
     html, body {
-      height: 100%;
+      height: 100vh;
       overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     }
 
     body {
       display: flex;
       flex-direction: column;
-      background: #f8f9fa;
+      font-family: monospace;
+      background: #fff;
     }
 
     .header {
-      height: 60px;
+      height: 48px;
       display: flex;
       align-items: center;
-      padding: 0 20px;
-      background-color: #ffffff;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      z-index: 10;
+      padding: 0 16px;
+      border-bottom: 1px solid #ccc;
+      background: #f8f8f8;
     }
 
     .logo {
-      font-weight: 700;
-      font-size: 24px;
+      font-weight: bold;
+      font-size: 18px;
       color: #1289d8;
     }
 
-    .title {
+    .tabs {
       margin-left: 20px;
-      font-size: 18px;
-      color: #333;
+      display: flex;
+      align-items: center;
+      height: 100%;
     }
 
-    .container {
+    .tab-btn {
+      padding: 0 16px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 14px;
+      border-right: 1px solid #e0e0e0;
+    }
+
+    .tab-btn.active {
+      font-weight: bold;
+      background: white;
+      border-bottom: 2px solid #1289d8;
+    }
+
+    .tab-content {
+      display: none;
       flex: 1;
+      min-height: 0;
+      flex-direction: column;
+    }
+
+    .tab-content.active {
+      display: flex;
+    }
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    .editor-panel {
+      width: 50%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #ccc;
+    }
+
+    .CodeMirror {
+      height: 100%;
+      font-size: 14px;
+      background: #fdf6e3;
+    }
+
+    .visualization-panel {
+      width: 50%;
       position: relative;
-      overflow: hidden;
     }
 
     #canvas-3d {
@@ -64,6 +117,24 @@
       height: 100%;
     }
 
+    .footer {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      border-top: 1px solid #ccc;
+      background: #f8f8f8;
+    }
+
+    .status {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .status.error {
+      color: #d32f2f;
+    }
+
     .controls-panel {
       position: absolute;
       top: 20px;
@@ -71,7 +142,7 @@
       background: rgba(255, 255, 255, 0.9);
       border-radius: 8px;
       padding: 15px;
-      width: 280px;
+      width: 220px;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
       z-index: 100;
     }
@@ -83,46 +154,22 @@
       color: #333;
     }
 
-    .control-group {
-      margin-bottom: 15px;
-    }
-
-    .control-group label {
+    .controls-panel button {
       display: block;
-      margin-bottom: 5px;
-      font-size: 14px;
-      color: #555;
-    }
-
-    .control-group select,
-    .control-group input {
       width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-
-    .control-group button {
+      padding: 8px 12px;
+      margin-bottom: 10px;
       background: #1289d8;
       color: white;
       border: none;
-      padding: 8px 12px;
       border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
-      margin-top: 5px;
+      text-align: center;
     }
 
-    .control-group button:hover {
+    .controls-panel button:hover {
       background: #0d6efd;
-    }
-
-    .shape-params {
-      max-height: 300px;
-      overflow-y: auto;
-      padding-right: 5px;
-      margin-bottom: 15px;
     }
 
     .navigation-hint {
@@ -136,1101 +183,291 @@
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
 
-    .view-controls {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 15px;
-    }
-
-    .view-controls button {
+    .docs-content {
       flex: 1;
-      padding: 8px;
-      background: #f0f0f0;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .view-controls button:hover {
-      background: #e0e0e0;
-    }
-
-    .material-controls {
-      margin-bottom: 15px;
-    }
-
-    .material-controls .color-picker {
-      display: flex;
-      align-items: center;
-    }
-
-    .material-controls .color-picker input {
-      width: 40px;
-      height: 30px;
-      padding: 0;
-      border: 1px solid #ddd;
-      margin-right: 10px;
+      padding: 20px 40px;
+      overflow-y: auto;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      color: #333;
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo">Aqui</div>
-    <div class="title">3D Shape Viewer - All 20 Shapes</div>
+    <div class="logo">3D Aqui.)</div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="3d-tab">3D</button>
+      <button class="tab-btn" data-tab="docs-tab">Docs</button>
+    </div>
   </div>
 
-  <div class="container">
-    <canvas id="canvas-3d"></canvas>
-    
-    <div class="controls-panel">
-      <h3>3D Shape Controls</h3>
-      
-      <div class="control-group">
-        <label for="shape-select">Select Shape:</label>
-        <select id="shape-select">
-          <option value="rectangle">Rectangle</option>
-          <option value="circle">Circle</option>
-          <option value="triangle">Triangle</option>
-          <option value="ellipse">Ellipse</option>
-          <option value="polygon">Regular Polygon</option>
-          <option value="star">Star</option>
-          <option value="arc">Arc</option>
-          <option value="roundedRectangle">Rounded Rectangle</option>
-          <option value="path">Path</option>
-          <option value="arrow">Arrow</option>
-          <option value="text">Text</option>
-          <option value="bezierCurve">Bezier Curve</option>
-          <option value="donut">Donut</option>
-          <option value="spiral">Spiral</option>
-          <option value="cross">Cross</option>
-          <option value="gear">Gear</option>
-          <option value="wave">Wave</option>
-          <option value="slot">Slot</option>
-          <option value="chamferRectangle">Chamfer Rectangle</option>
-          <option value="polygonWithHoles">Polygon with Holes</option>
-        </select>
+  <!-- 3D Tab -->
+  <div class="tab-content active" id="3d-tab">
+    <div class="main-content">
+      <div class="editor-panel">
+        <textarea id="code-editor">//Aqui
+</textarea>
       </div>
-      
-      <div class="control-group">
-        <label for="extrusion-depth">Extrusion Depth:</label>
-        <input type="range" id="extrusion-depth" min="1" max="50" value="10">
-        <span id="depth-value">10</span>
-      </div>
-      
-      <div class="material-controls">
-        <label>Material:</label>
-        <div class="color-picker">
-          <input type="color" id="shape-color" value="#1289d8">
-          <select id="material-type">
-            <option value="standard">Standard</option>
-            <option value="basic">Basic</option>
-            <option value="phong">Phong</option>
-            <option value="wireframe">Wireframe</option>
-          </select>
+      <div class="visualization-panel">
+        <canvas id="canvas-3d"></canvas>
+        
+        <div class="controls-panel">
+          <h3>3D Controls</h3>
+          <button id="run-button">Run Code (Shift + Enter)</button>
+          <button id="reset-view">Reset View</button>
+          <button id="toggle-grid">Toggle Grid</button>
+        </div>
+        
+        <div class="navigation-hint">
+          <strong>Controls:</strong> Click and drag to rotate • Scroll to zoom • Shift+drag to pan
         </div>
       </div>
-      
-      <div id="shape-params" class="shape-params">
-        <!-- Dynamic parameters will be inserted here -->
-      </div>
-      
-      <div class="view-controls">
-        <button id="reset-view">Reset View</button>
-        <button id="toggle-grid">Toggle Grid</button>
-      </div>
     </div>
-    
-    <div class="navigation-hint">
-      <strong>Controls:</strong> Click and drag to rotate • Scroll to zoom • Shift+drag to pan
+
+    <div class="footer">
+      <div id="status" class="status">Ready</div>
     </div>
   </div>
 
+  <!-- Documentation Tab -->
+  <div class="tab-content" id="docs-tab">
+    <div class="docs-content" id="markdown-content"></div>
+  </div>
+
+  <!-- CRITICAL: Define THREE globally before module imports -->
   <script>
-    // Get DOM elements
-    const canvas = document.getElementById('canvas-3d');
-    const shapeSelect = document.getElementById('shape-select');
-    const depthSlider = document.getElementById('extrusion-depth');
-    const depthValue = document.getElementById('depth-value');
-    const resetViewButton = document.getElementById('reset-view');
-    const toggleGridButton = document.getElementById('toggle-grid');
-    const shapeParamsContainer = document.getElementById('shape-params');
-    const colorPicker = document.getElementById('shape-color');
-    const materialTypeSelect = document.getElementById('material-type');
+    // Make THREE.js available globally for modules
+    window.THREE = THREE;
+    console.log("THREE.js initialized globally:", !!window.THREE);
+  </script>
+
+  <!-- Main script -->
+  <script type="module">
+    // Import necessary modules
+    import { Lexer3D } from './Lexer3D.mjs';
+    import { Parser3D } from './Parser3D.mjs';
+    import { Interpreter3D } from './Interpreter3D.mjs';
+    import { Renderer3D } from './Renderer3D.mjs';
     
-    // Three.js variables
-    let scene, camera, renderer, controls;
-    let currentShape = null;
-    let gridHelper;
-    let showGrid = true;
-    
-    // Shape definitions with default parameters
-    const shapes = {
-      rectangle: { 
-        params: { width: 50, height: 30 } 
-      },
-      circle: { 
-        params: { radius: 30 } 
-      },
-      triangle: { 
-        params: { base: 60, height: 40 } 
-      },
-      ellipse: { 
-        params: { radiusX: 40, radiusY: 20 } 
-      },
-      polygon: { 
-        params: { radius: 30, sides: 6 } 
-      },
-      star: { 
-        params: { outerRadius: 30, innerRadius: 15, points: 5 } 
-      },
-      arc: { 
-        params: { radius: 30, startAngle: 0, endAngle: 270, thickness: 5 } 
-      },
-      roundedRectangle: { 
-        params: { width: 50, height: 30, radius: 10 } 
-      },
-      path: { 
-        params: { closed: true } 
-        // Path points will be created programmatically 
-      },
-      arrow: { 
-        params: { length: 60, headWidth: 20, headLength: 15, shaftWidth: 8 } 
-      },
-      text: { 
-        params: { text: "Aqui", fontSize: 20, height: 5 } 
-      },
-      bezierCurve: { 
-        params: { thickness: 5 } 
-        // Curve points will be created programmatically
-      },
-      donut: { 
-        params: { outerRadius: 30, innerRadius: 15 } 
-      },
-      spiral: { 
-        params: { startRadius: 5, endRadius: 30, turns: 3, thickness: 5 } 
-      },
-      cross: { 
-        params: { width: 40, thickness: 10 } 
-      },
-      gear: { 
-        params: { diameter: 60, teeth: 12 } 
-      },
-      wave: { 
-        params: { width: 80, amplitude: 15, frequency: 3, thickness: 5 } 
-      },
-      slot: { 
-        params: { length: 60, width: 15 } 
-      },
-      chamferRectangle: { 
-        params: { width: 50, height: 30, chamfer: 10 } 
-      },
-      polygonWithHoles: { 
-        params: { radius: 40, holeRadius: 15 } 
-        // Points will be created programmatically
-      }
-    };
-    
-    // Initialize the 3D scene
-    function init() {
-      // Create scene
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xf8f9fa);
-      
-      // Create camera
-      camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
-      camera.position.z = 100;
-      
-      // Create renderer
-      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-      renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
-      
-      // Create lights
-      const ambientLight = new THREE.AmbientLight(0x404040);
-      scene.add(ambientLight);
-      
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      directionalLight.position.set(1, 1, 1).normalize();
-      scene.add(directionalLight);
-      
-      const pointLight = new THREE.PointLight(0xffffff, 0.5);
-      pointLight.position.set(-50, 50, 50);
-      scene.add(pointLight);
-      
-      // Add grid helper
-      gridHelper = new THREE.GridHelper(100, 20);
-      gridHelper.rotation.x = Math.PI / 2;
-      scene.add(gridHelper);
-      
-      // Add controls
-      controls = new THREE.OrbitControls(camera, canvas);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-      
-      // Set up event listeners
-      shapeSelect.addEventListener('change', updateShape);
-      depthSlider.addEventListener('input', function() {
-        depthValue.textContent = this.value;
-        updateShape();
-      });
-      resetViewButton.addEventListener('click', resetView);
-      toggleGridButton.addEventListener('click', toggleGrid);
-      colorPicker.addEventListener('change', updateShape);
-      materialTypeSelect.addEventListener('change', updateShape);
-      window.addEventListener('resize', onWindowResize);
-      
-      // Initial shape creation
-      createParamControls(shapeSelect.value);
-      updateShape();
-      
-      // Start animation loop
-      animate();
-    }
-    
-    // Animation loop
-    function animate() {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    
-    // Window resize handler
-    function onWindowResize() {
-      camera.aspect = canvas.clientWidth / canvas.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-    }
-    
-    // Reset camera view
-    function resetView() {
-      camera.position.set(0, 0, 100);
-      camera.lookAt(0, 0, 0);
-      controls.target.set(0, 0, 0);
-      controls.update();
-    }
-    
-    // Toggle grid visibility
-    function toggleGrid() {
-      showGrid = !showGrid;
-      gridHelper.visible = showGrid;
-    }
-    
-    // Create parameter controls based on selected shape
-    function createParamControls(shapeType) {
-      shapeParamsContainer.innerHTML = '';
-      
-      const params = shapes[shapeType].params;
-      
-      for (const [key, value] of Object.entries(params)) {
-        // Skip text parameter for text shape (handled separately)
-        if (shapeType === 'text' && key === 'text') {
-          const group = document.createElement('div');
-          group.className = 'control-group';
-          
-          const label = document.createElement('label');
-          label.textContent = 'Text:';
-          label.htmlFor = 'param-text';
-          
-          const input = document.createElement('input');
-          input.type = 'text';
-          input.id = 'param-text';
-          input.dataset.param = 'text';
-          input.value = value;
-          
-          input.addEventListener('input', function() {
-            shapes[shapeType].params[key] = this.value;
-            updateShape();
-          });
-          
-          group.appendChild(label);
-          group.appendChild(input);
-          shapeParamsContainer.appendChild(group);
-          continue;
-        }
-        
-        // Skip boolean parameters (handled with checkbox)
-        if (typeof value === 'boolean') {
-          const group = document.createElement('div');
-          group.className = 'control-group';
-          
-          const label = document.createElement('label');
-          label.textContent = formatParamName(key) + ':';
-          
-          const input = document.createElement('input');
-          input.type = 'checkbox';
-          input.dataset.param = key;
-          input.checked = value;
-          
-          input.addEventListener('change', function() {
-            shapes[shapeType].params[key] = this.checked;
-            updateShape();
-          });
-          
-          label.prepend(input);
-          group.appendChild(label);
-          shapeParamsContainer.appendChild(group);
-          continue;
-        }
-        
-        const group = document.createElement('div');
-        group.className = 'control-group';
-        
-        const label = document.createElement('label');
-        label.textContent = formatParamName(key) + ':';
-        label.htmlFor = `param-${key}`;
-        
-        const input = document.createElement('input');
-        input.type = 'range';
-        input.id = `param-${key}`;
-        input.dataset.param = key;
-        
-        // Set min/max based on parameter type
-        if (key.includes('radius') || key.includes('diameter')) {
-          input.min = '5';
-          input.max = '50';
-        } else if (key.includes('sides') || key.includes('points') || key.includes('teeth')) {
-          input.min = '3';
-          input.max = '20';
-          input.step = '1';
-        } else if (key.includes('angle')) {
-          input.min = '0';
-          input.max = '360';
-          input.step = '5';
-        } else if (key.includes('thickness') || key.includes('width') && !key.includes('head')) {
-          input.min = '1';
-          input.max = '30';
-        } else if (key === 'turns' || key === 'frequency') {
-          input.min = '1';
-          input.max = '10';
-          input.step = '0.5';
-        } else if (key === 'height' && shapeType === 'text') {
-          input.min = '1';
-          input.max = '20';
-        } else if (key === 'fontSize') {
-          input.min = '10';
-          input.max = '50';
-        } else {
-          input.min = '5';
-          input.max = '100';
-        }
-        
-        input.value = value;
-        
-        const valueDisplay = document.createElement('span');
-        valueDisplay.id = `value-${key}`;
-        valueDisplay.textContent = value;
-        
-        input.addEventListener('input', function() {
-          valueDisplay.textContent = this.value;
-          shapes[shapeType].params[key] = parseFloat(this.value);
-          updateShape();
-        });
-        
-        group.appendChild(label);
-        group.appendChild(input);
-        group.appendChild(valueDisplay);
-        
-        shapeParamsContainer.appendChild(group);
-      }
-    }
-    
-    // Format parameter name for display
-    function formatParamName(name) {
-      return name
-        .replace(/([A-Z])/g, ' $1')
-        .replace(/^./, str => str.toUpperCase());
-    }
-    
-    // Create material based on user selection
-    function createMaterial() {
-      const color = colorPicker.value;
-      const materialType = materialTypeSelect.value;
-      
-      switch (materialType) {
-        case 'basic':
-          return new THREE.MeshBasicMaterial({
-            color: color,
-            side: THREE.DoubleSide,
-            wireframe: false
-          });
-        case 'phong':
-          return new THREE.MeshPhongMaterial({
-            color: color,
-            shininess: 30,
-            side: THREE.DoubleSide,
-            wireframe: false
-          });
-        case 'wireframe':
-          return new THREE.MeshBasicMaterial({
-            color: color,
-            wireframe: true
-          });
-        case 'standard':
-        default:
-          return new THREE.MeshStandardMaterial({
-            color: color,
-            metalness: 0.2,
-            roughness: 0.7,
-            side: THREE.DoubleSide
-          });
-      }
-    }
-    
-    // Update the 3D shape
-    function updateShape() {
-      // Remove current shape if any
-      if (currentShape) {
-        scene.remove(currentShape);
-        if (currentShape.geometry) currentShape.geometry.dispose();
-        if (currentShape.material) currentShape.material.dispose();
-      }
-      
-      const shapeType = shapeSelect.value;
-      const params = shapes[shapeType].params;
-      const depth = parseInt(depthSlider.value);
-      const material = createMaterial();
-      
-      // Create new shape
-      currentShape = create3DShape(shapeType, params, depth, material);
-      scene.add(currentShape);
-    }
-    
-    // Create a 3D shape based on type and parameters
-    function create3DShape(type, params, depth, material) {
-      let geometry;
-      
-      switch (type) {
-        case 'rectangle':
-          geometry = new THREE.BoxGeometry(params.width, params.height, depth);
-          break;
-          
-        case 'circle':
-          geometry = new THREE.CylinderGeometry(params.radius, params.radius, depth, 32);
-          geometry.rotateX(Math.PI / 2);
-          break;
-          
-        case 'triangle':
-          geometry = createExtrudedTriangle(params.base, params.height, depth);
-          break;
-          
-        case 'ellipse':
-          geometry = createExtrudedEllipse(params.radiusX, params.radiusY, depth);
-          break;
-          
-        case 'polygon':
-          geometry = createExtrudedPolygon(params.radius, params.sides, depth);
-          break;
-          
-        case 'star':
-          geometry = createExtrudedStar(params.outerRadius, params.innerRadius, params.points, depth);
-          break;
-          
-        case 'arc':
-          geometry = createExtrudedArc(
-            params.radius, 
-            params.startAngle, 
-            params.endAngle, 
-            params.thickness, 
-            depth
-          );
-          break;
-          
-        case 'roundedRectangle':
-          geometry = createExtrudedRoundedRectangle(
-            params.width, 
-            params.height, 
-            params.radius, 
-            depth
-          );
-          break;
-          
-        case 'path':
-          geometry = createExtrudedPath(params.closed, depth);
-          break;
-          
-        case 'arrow':
-          geometry = createExtrudedArrow(
-            params.length, 
-            params.headWidth, 
-            params.headLength, 
-            params.shaftWidth, 
-            depth
-          );
-          break;
-          
-        case 'text':
-          geometry = createExtrudedText(
-            params.text, 
-            params.fontSize, 
-            params.height
-          );
-          break;
-          
-        case 'bezierCurve':
-          geometry = createExtrudedBezierCurve(params.thickness, depth);
-          break;
-          
-        case 'donut':
-          geometry = createExtrudedDonut(params.outerRadius, params.innerRadius, depth);
-          break;
-          
-        case 'spiral':
-          geometry = createExtrudedSpiral(
-            params.startRadius, 
-            params.endRadius, 
-            params.turns, 
-            params.thickness, 
-            depth
-          );
-          break;
-          
-        case 'cross':
-          geometry = createExtrudedCross(params.width, params.thickness, depth);
-          break;
-          
-        case 'gear':
-          geometry = createExtrudedGear(params.diameter, params.teeth, depth);
-          break;
-          
-        case 'wave':
-          geometry = createExtrudedWave(
-            params.width, 
-            params.amplitude, 
-            params.frequency, 
-            params.thickness, 
-            depth
-          );
-          break;
-          
-        case 'slot':
-          geometry = createExtrudedSlot(params.length, params.width, depth);
-          break;
-          
-        case 'chamferRectangle':
-          geometry = createExtrudedChamferRectangle(
-            params.width, 
-            params.height, 
-            params.chamfer, 
-            depth
-          );
-          break;
-          
-        case 'polygonWithHoles':
-          geometry = createExtrudedPolygonWithHoles(
-            params.radius, 
-            params.holeRadius, 
-            depth
-          );
-          break;
-          
-        default:
-          geometry = new THREE.BoxGeometry(30, 30, depth);
-      }
-      
-      return new THREE.Mesh(geometry, material);
-    }
-    
-    // Helper function to create an extruded triangle
-    function createExtrudedTriangle(base, height, depth) {
-      const shape = new THREE.Shape();
-      
-      shape.moveTo(-base/2, -height/2);
-      shape.lineTo(base/2, -height/2);
-      shape.lineTo(0, height/2);
-      shape.closePath();
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create an extruded ellipse
-    function createExtrudedEllipse(radiusX, radiusY, depth) {
-      const shape = new THREE.Shape();
-      shape.ellipse(0, 0, radiusX, radiusY, 0, Math.PI * 2);
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create an extruded polygon
-    function createExtrudedPolygon(radius, sides, depth) {
-      const shape = new THREE.Shape();
-      
-      for (let i = 0; i < sides; i++) {
-        const angle = (i / sides) * Math.PI * 2;
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius;
-        
-        if (i === 0) {
-          shape.moveTo(x, y);
-        } else {
-          shape.lineTo(x, y);
-        }
-      }
-      
-      shape.closePath();
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create an extruded star
-    function createExtrudedStar(outerRadius, innerRadius, points, depth) {
-      const shape = new THREE.Shape();
-      
-      for (let i = 0; i < points * 2; i++) {
-        const angle = (i / (points * 2)) * Math.PI * 2;
-        const radius = i % 2 === 0 ? outerRadius : innerRadius;
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius;
-        
-        if (i === 0) {
-          shape.moveTo(x, y);
-        } else {
-          shape.lineTo(x, y);
-        }
-      }
-      
-      shape.closePath();
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create an extruded arc
-    function createExtrudedArc(radius, startAngle, endAngle, thickness, depth) {
-      const shape = new THREE.Shape();
-      const startRad = startAngle * Math.PI / 180;
-      const endRad = endAngle * Math.PI / 180;
-      
-      // Draw the outer arc
-      shape.moveTo(
-        Math.cos(startRad) * (radius + thickness/2), 
-        Math.sin(startRad) * (radius + thickness/2)
-      );
-      
-      shape.absarc(0, 0, radius + thickness/2, startRad, endRad, false);
-      
-      // Draw the inner arc (counter-clockwise)
-      shape.lineTo(
-        Math.cos(endRad) * (radius - thickness/2), 
-        Math.sin(endRad) * (radius - thickness/2)
-      );
-      
-      shape.absarc(0, 0, radius - thickness/2, endRad, startRad, true);
-      
-      shape.closePath();
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create an extruded rounded rectangle
-    function createExtrudedRoundedRectangle(width, height, cornerRadius, depth) {
-      const shape = new THREE.Shape();
-      
-      const x = -width / 2;
-      const y = -height / 2;
-      
-      shape.moveTo(x, y + cornerRadius);
-      shape.lineTo(x, y + height - cornerRadius);
-      shape.quadraticCurveTo(x, y + height, x + cornerRadius, y + height);
-      shape.lineTo(x + width - cornerRadius, y + height);
-      shape.quadraticCurveTo(x + width, y + height, x + width, y + height - cornerRadius);
-      shape.lineTo(x + width, y + cornerRadius);
-      shape.quadraticCurveTo(x + width, y, x + width - cornerRadius, y);
-      shape.lineTo(x + cornerRadius, y);
-      shape.quadraticCurveTo(x, y, x, y + cornerRadius);
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create an extruded path
-    function createExtrudedPath(closed, depth) {
-      const shape = new THREE.Shape();
-      
-      // Create a simple path shape (e.g., a triangle or custom path)
-      shape.moveTo(0, 30);
-      shape.lineTo(30, -15);
-      shape.lineTo(-30, -15);
-      
-      if (closed) {
-        shape.closePath();
-      }
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create an extruded arrow
-    function createExtrudedArrow(length, headWidth, headLength, shaftWidth, depth) {
-      const shape = new THREE.Shape();
-      
-      // Draw the arrow
-      shape.moveTo(0, -shaftWidth/2);
-      shape.lineTo(length - headLength, -shaftWidth/2);
-      shape.lineTo(length - headLength, -headWidth/2);
-      shape.lineTo(length, 0);
-      shape.lineTo(length - headLength, headWidth/2);
-      shape.lineTo(length - headLength, shaftWidth/2);
-      shape.lineTo(0, shaftWidth/2);
-      shape.closePath();
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create extruded text
-    function createExtrudedText(text, fontSize, height) {
-      // Since Three.js requires loading a font, we'll create a simple block letter
-      // representation of text. In a real application, you'd use TextGeometry with a font.
-      
-      const shape = new THREE.Shape();
-      const letterWidth = fontSize * 0.6;
-      const letterSpacing = fontSize * 0.2;
-      const totalWidth = text.length * letterWidth + (text.length - 1) * letterSpacing;
-      
-      shape.moveTo(-totalWidth/2, -fontSize/2);
-      shape.lineTo(totalWidth/2, -fontSize/2);
-      shape.lineTo(totalWidth/2, fontSize/2);
-      shape.lineTo(-totalWidth/2, fontSize/2);
-      shape.closePath();
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: height,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create a bezier curve
-    function createExtrudedBezierCurve(thickness, depth) {
-      // Create a curved tube using an array of points
-      const curve = new THREE.CubicBezierCurve3(
-        new THREE.Vector3(-30, -10, 0),
-        new THREE.Vector3(-10, 20, 0),
-        new THREE.Vector3(10, 20, 0),
-        new THREE.Vector3(30, -10, 0)
-      );
-      
-      const points = curve.getPoints(50);
-      const geometry = new THREE.TubeGeometry(
-        new THREE.CatmullRomCurve3(points),
-        64,           // tubularSegments
-        thickness/2,  // radius
-        8,            // radiusSegments
-        false         // closed
-      );
-      
-      return geometry;
-    }
-    
-    // Helper function to create an extruded donut
-    function createExtrudedDonut(outerRadius, innerRadius, depth) {
-      const shape = new THREE.Shape();
-      shape.absarc(0, 0, outerRadius, 0, Math.PI * 2, false);
-      
-      const hole = new THREE.Path();
-      hole.absarc(0, 0, innerRadius, 0, Math.PI * 2, true);
-      shape.holes.push(hole);
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create a spiral
-    function createExtrudedSpiral(startRadius, endRadius, turns, thickness, depth) {
-      // Create a spiral path
-      const points = [];
-      const numPoints = 100 * turns;
-      
-      for (let i = 0; i < numPoints; i++) {
-        const t = i / numPoints;
-        const angle = t * turns * Math.PI * 2;
-        const radius = startRadius + (endRadius - startRadius) * t;
-        
-        points.push(new THREE.Vector3(
-          Math.cos(angle) * radius,
-          Math.sin(angle) * radius,
-          0
-        ));
-      }
-      
-      // Create a tube along the spiral
-      const geometry = new THREE.TubeGeometry(
-        new THREE.CatmullRomCurve3(points),
-        numPoints,      // tubularSegments
-        thickness/2,    // radius
-        8,              // radiusSegments
-        false           // closed
-      );
-      
-      return geometry;
-    }
-    
-    // Helper function to create an extruded cross
-    function createExtrudedCross(width, thickness, depth) {
-      const shape = new THREE.Shape();
-      
-      // Draw a cross shape
-      const w = width / 2;
-      const t = thickness / 2;
-      
-      shape.moveTo(-t, -w);
-      shape.lineTo(t, -w);
-      shape.lineTo(t, -t);
-      shape.lineTo(w, -t);
-      shape.lineTo(w, t);
-      shape.lineTo(t, t);
-      shape.lineTo(t, w);
-      shape.lineTo(-t, w);
-      shape.lineTo(-t, t);
-      shape.lineTo(-w, t);
-      shape.lineTo(-w, -t);
-      shape.lineTo(-t, -t);
-      shape.closePath();
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create an extruded gear
-    function createExtrudedGear(diameter, teeth, depth) {
-      const shape = new THREE.Shape();
-      const radius = diameter / 2;
-      const toothSize = radius * 0.2;
-      
-      for (let i = 0; i < teeth; i++) {
-        const angle1 = (i / teeth) * Math.PI * 2;
-        const angle2 = ((i + 0.3) / teeth) * Math.PI * 2;
-        const angle3 = ((i + 0.5) / teeth) * Math.PI * 2;
-        const angle4 = ((i + 0.7) / teeth) * Math.PI * 2;
-        const angle5 = ((i + 1) / teeth) * Math.PI * 2;
-        
-        const x1 = Math.cos(angle1) * radius;
-        const y1 = Math.sin(angle1) * radius;
-        const x2 = Math.cos(angle2) * radius;
-        const y2 = Math.sin(angle2) * radius;
-        const x3 = Math.cos(angle3) * (radius + toothSize);
-        const y3 = Math.sin(angle3) * (radius + toothSize);
-        const x4 = Math.cos(angle4) * (radius + toothSize);
-        const y4 = Math.sin(angle4) * (radius + toothSize);
-        const x5 = Math.cos(angle5) * radius;
-        const y5 = Math.sin(angle5) * radius;
-        
-        if (i === 0) {
-          shape.moveTo(x1, y1);
-        } else {
-          shape.lineTo(x1, y1);
-        }
-        
-        shape.lineTo(x2, y2);
-        shape.lineTo(x3, y3);
-        shape.lineTo(x4, y4);
-        shape.lineTo(x5, y5);
-      }
-      
-      shape.closePath();
-      
-      // Add center hole
-      const hole = new THREE.Path();
-      hole.absarc(0, 0, radius * 0.3, 0, Math.PI * 2, true);
-      shape.holes.push(hole);
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: true,
-        bevelThickness: depth * 0.05,
-        bevelSize: depth * 0.05,
-        bevelOffset: 0,
-        bevelSegments: 3
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create an extruded wave
-    function createExtrudedWave(width, amplitude, frequency, thickness, depth) {
-      // Create a wave path
-      const points = [];
-      const numPoints = 50;
-      
-      for (let i = 0; i <= numPoints; i++) {
-        const t = i / numPoints;
-        const x = (t - 0.5) * width;
-        const y = Math.sin(t * frequency * Math.PI * 2) * amplitude;
-        
-        points.push(new THREE.Vector3(x, y, 0));
-      }
-      
-      // Create a tube along the wave
-      const geometry = new THREE.TubeGeometry(
-        new THREE.CatmullRomCurve3(points),
-        numPoints,      // tubularSegments
-        thickness/2,    // radius
-        8,              // radiusSegments
-        false           // closed
-      );
-      
-      return geometry;
-    }
-    
-    // Helper function to create an extruded slot
-    function createExtrudedSlot(length, width, depth) {
-      const shape = new THREE.Shape();
-      
-      // Draw a slot shape (rounded rectangle)
-      const radius = width / 2;
-      const straightLength = length - width;
-      
-      shape.absarc(straightLength/2, 0, radius, 0, Math.PI * 2, true);
-      shape.absarc(-straightLength/2, 0, radius, 0, Math.PI * 2, true);
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create an extruded chamfer rectangle
-    function createExtrudedChamferRectangle(width, height, chamfer, depth) {
-      const shape = new THREE.Shape();
-      
-      const w = width / 2;
-      const h = height / 2;
-      const c = Math.min(chamfer, w, h);
-      
-      shape.moveTo(-w + c, -h);
-      shape.lineTo(w - c, -h);
-      shape.lineTo(w, -h + c);
-      shape.lineTo(w, h - c);
-      shape.lineTo(w - c, h);
-      shape.lineTo(-w + c, h);
-      shape.lineTo(-w, h - c);
-      shape.lineTo(-w, -h + c);
-      shape.closePath();
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // Helper function to create an extruded polygon with holes
-    function createExtrudedPolygonWithHoles(outerRadius, holeRadius, depth) {
-      // Create a polygon with a hole
-      const shape = new THREE.Shape();
-      const sides = 6; // Hexagon
-      
-      // Create the outer shape
-      for (let i = 0; i < sides; i++) {
-        const angle = (i / sides) * Math.PI * 2;
-        const x = Math.cos(angle) * outerRadius;
-        const y = Math.sin(angle) * outerRadius;
-        
-        if (i === 0) {
-          shape.moveTo(x, y);
-        } else {
-          shape.lineTo(x, y);
-        }
-      }
-      
-      shape.closePath();
-      
-      // Add a hole
-      const hole = new THREE.Path();
-      for (let i = 0; i < sides; i++) {
-        const angle = (i / sides) * Math.PI * 2;
-        const x = Math.cos(angle) * holeRadius;
-        const y = Math.sin(angle) * holeRadius;
-        
-        if (i === 0) {
-          hole.moveTo(x, y);
-        } else {
-          hole.lineTo(x, y);
-        }
-      }
-      
-      hole.closePath();
-      shape.holes.push(hole);
-      
-      const extrudeSettings = {
-        steps: 1,
-        depth: depth,
-        bevelEnabled: false
-      };
-      
-      return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    }
-    
-    // When shape changes
-    shapeSelect.addEventListener('change', function() {
-      createParamControls(this.value);
-      updateShape();
+    // Initialize CodeMirror
+    CodeMirror.defineSimpleMode("aqui3d", {
+      start: [
+        { regex: /\/\/.*/, token: "comment" },
+        { regex: /\b(param|shape3d|layer|transform|add|rotate|scale|position|depth|extrude|bevel|material|if|else|for|from|to|step|def|return)\b/, token: "keyword" },
+        { regex: /\b\d+(\.\d+)?\b/, token: "number" },
+        { regex: /\b(0x[0-9a-fA-F]+)\b/, token: "number" }, // Hex color support
+        { regex: /"(?:[^\\]|\\.)*?"/, token: "string" },
+        { regex: /true|false/, token: "atom" },
+        { regex: /[\{\}\[\]:,()]/, token: "operator" }
+      ]
+    });
+
+    const editor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+      mode: "aqui3d",
+      theme: "default",
+      lineNumbers: true,
+      autoCloseBrackets: true,
+      indentUnit: 2,
+      tabSize: 2
     });
     
-    // Initialize on page load
-    window.addEventListener('load', init);
+    // DOM elements
+    const canvas = document.getElementById('canvas-3d');
+    const statusElement = document.getElementById('status');
+    const runButton = document.getElementById('run-button');
+    const resetViewButton = document.getElementById('reset-view');
+    const toggleGridButton = document.getElementById('toggle-grid');
+    const exportGltfButton = document.getElementById('export-gltf');
+    
+    // Initialize renderer
+    let renderer;
+    try {
+      renderer = new Renderer3D(canvas);
+      console.log("Renderer initialized successfully");
+    } catch (error) {
+      console.error("Error initializing renderer:", error);
+      statusElement.textContent = `Error initializing renderer: ${error.message}`;
+      statusElement.className = "status error";
+    }
+    
+    // Function to run code
+    function runCode() {
+      try {
+        statusElement.textContent = "Processing...";
+        statusElement.className = "status";
+        
+        const code = editor.getValue();
+        
+        // Use the full language infrastructure
+        console.log("Creating lexer...");
+        const lexer = new Lexer3D(code);
+        
+        console.log("Creating parser...");
+        const parser = new Parser3D(lexer);
+        
+        console.log("Parsing code...");
+        const ast = parser.parse();
+        console.log("AST:", ast);
+        
+        // Execute code
+        console.log("Interpreting code...");
+        const interpreter = new Interpreter3D();
+        const results = interpreter.interpret(ast);
+        console.log("Interpretation results:", results);
+        
+        // Render results
+        console.log("Rendering results...");
+        renderer.renderResults(results);
+        
+        statusElement.textContent = "Code executed successfully";
+      } catch (error) {
+        console.error("Error executing code:", error);
+        statusElement.textContent = `Error: ${error.message}`;
+        statusElement.className = "status error";
+      }
+    }
+    
+    // Add event listeners
+    runButton.addEventListener('click', runCode);
+    
+    resetViewButton.addEventListener('click', () => {
+      renderer.resetView();
+    });
+    
+    toggleGridButton.addEventListener('click', () => {
+      renderer.toggleGrid();
+    });
+    
+    exportGltfButton.addEventListener('click', () => {
+      alert('GLTF Export not implemented in this demo.');
+    });
+    
+    // Add Shift+Enter shortcut for running code
+    editor.on("keydown", (cm, event) => {
+      if (event.shiftKey && event.key === "Enter") {
+        event.preventDefault();
+        runCode();
+      }
+    });
+    
+    // Tab functionality
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const tabId = button.getAttribute('data-tab');
+        
+        // Deactivate all tabs
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+        
+        // Activate clicked tab
+        button.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+        
+        // Resize renderer if needed
+        if (tabId === '3d-tab') {
+          renderer.onWindowResize();
+        }
+      });
+    });
+    
+    // Add documentation content
+    document.querySelector('.tab-btn[data-tab="docs-tab"]').addEventListener('click', () => {
+      const markdownContent = document.getElementById('markdown-content');
+      if (!markdownContent.innerHTML) {
+        markdownContent.innerHTML = `
+          <h1>3D Aqui Programming Language</h1>
+          
+          <h2>Overview</h2>
+          <p>3D Aqui is a domain-specific programming language for parametric 3D shape creation and manipulation.</p>
+          
+          <h2>Basic Syntax</h2>
+          <pre><code>// Define parameters
+param size 50
+param depth 20
+
+// Create 3D shapes
+shape3d rectangle myBox {
+  width: param.size
+  height: param.size
+  depth: param.depth
+  position: [0, 0, 0]
+  material: {
+    color: 0x1289d8
+  }
+}
+
+// Conditional statements
+if param.size > 40 {
+  shape3d circle myCylinder {
+    radius: param.size / 2
+    depth: param.depth
+    position: [param.size * 1.5, 0, 0]
+  }
+}</code></pre>
+          
+          <h2>Shapes</h2>
+          <p>The following 3D shapes are supported:</p>
+          <ul>
+            <li>rectangle - A box with width, height, and depth</li>
+            <li>circle - A cylinder with radius and depth</li>
+            <li>triangle - An extruded triangle with base and height</li>
+            <li>ellipse - An elliptical cylinder with radiusX and radiusY</li>
+            <li>polygon - A regular polygon with radius and sides</li>
+            <li>star - A star with inner and outer radius and points</li>
+            <li>arc - A segment of a circle with radius, startAngle, and endAngle</li>
+            <li>roundedRectangle - A rectangle with rounded corners</li>
+            <li>path - A shape defined by a series of points</li>
+            <li>arrow - An arrow with specified length, headWidth, and headLength</li>
+            <li>text - 3D text with text, fontSize, and fontFamily (basic support)</li>
+            <li>bezierCurve - A Bezier curve defined by control points</li>
+            <li>donut - A torus with inner and outer radius</li>
+            <li>spiral - A spiral with start and end radius and turns</li>
+            <li>cross - A plus-shaped cross with width and thickness</li>
+            <li>gear - A gear with diameter and teeth</li>
+            <li>wave - A sinusoidal wave with width, amplitude, and frequency</li>
+            <li>slot - A pill-shaped slot with length and width</li>
+            <li>chamferRectangle - A rectangle with chamfered corners</li>
+            <li>polygonWithHoles - A polygon with holes defined by arrays of points</li>
+          </ul>
+          
+          <h2>Transformations</h2>
+          <p>Shapes can be transformed in 3D space:</p>
+          <pre><code>transform myShape {
+  position: [x, y, z]
+  rotate: [angleX, angleY, angleZ]
+  scale: [scaleX, scaleY, scaleZ]
+  depth: depthValue
+}</code></pre>
+          
+          <h2>Layers</h2>
+          <p>Shapes can be grouped into layers for collective transformations:</p>
+          <pre><code>layer myLayer {
+  add shape1
+  add shape2
+  rotate: [0, 45, 0]
+}</code></pre>
+        `;
+      }
+    });
+    
+    // Run initial code
+    window.addEventListener('DOMContentLoaded', () => {
+      // Ensure the THREE.js and controls are properly loaded before running
+      setTimeout(() => {
+        try {
+          console.log("Running initial code...");
+          runCode();
+        } catch (error) {
+          console.error("Error running initial code:", error);
+          statusElement.textContent = `Initialization error: ${error.message}`;
+          statusElement.className = "status error";
+        }
+      }, 300);
+    });
   </script>
 </body>
 </html>
