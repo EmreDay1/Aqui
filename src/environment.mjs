@@ -67,6 +67,7 @@ export class Environment {
     }
   
     createLayer(name) {
+        const self = this; // Store reference to environment for use in getter
         const layer = {
             name,
             addedShapes: new Set(),  
@@ -75,6 +76,17 @@ export class Environment {
                 position: [0, 0],
                 rotation: 0,
                 scale: [1, 1]
+            },
+            // Add a getter for shapes to make layers work with renderer
+            get shapes() {
+                const shapeArray = [];
+                this.addedShapes.forEach(shapeName => {
+                    const shape = self.shapes.get(shapeName);
+                    if (shape) {
+                        shapeArray.push(shape);
+                    }
+                });
+                return shapeArray;
             }
         };
         this.layers.set(name, layer);
@@ -103,23 +115,8 @@ export class Environment {
         const shape = this.getShape(name);
         if (!shape) return;
   
-        if (shape.layerName && this.isShapeInLayer(name, shape.layerName)) {
-            const layer = this.layers.get(shape.layerName);
-            shape.transform = {
-                ...transform,
-                rotation: transform.rotation + layer.transform.rotation,
-                scale: [
-                    transform.scale[0] * layer.transform.scale[0],
-                    transform.scale[1] * layer.transform.scale[1]
-                ],
-                position: [
-                    transform.position[0] + layer.transform.position[0],
-                    transform.position[1] + layer.transform.position[1]
-                ]
-            };
-        } else {
-            shape.transform = transform;
-        }
+        // Simply store the transform - layers will be handled at render time
+        shape.transform = { ...transform };
     }
   
     // Function handling
@@ -133,4 +130,4 @@ export class Environment {
         }
         return this.functions.get(name);
     }
-  }
+}
