@@ -392,8 +392,11 @@
       <button class="tab-btn active" data-tab="editor-tab">AQUI</button>
       <button class="tab-btn" data-tab="docs-tab">Docs</button>
       <button class="tab-btn" data-tab="3d-tab">3D</button>
+      
     </div>
   </div>
+
+  
 
   <!-- Editor Tab -->
   <div class="tab-content active" id="editor-tab">
@@ -457,6 +460,7 @@
     </div>
   </div>
 
+  <!-- HTML Structure for the Parameters Panel -->
   <!-- CRITICAL: Define THREE globally before module imports -->
   <script>
     // Make THREE.js available globally for modules
@@ -532,6 +536,44 @@
     const { Interpreter } = await import('./interpreter.mjs');
     const { Renderer } = await import('./renderer.mjs');
     const { TurtleDrawer } = await import('./turtleDrawer.mjs');
+    // Add this to the import section of your index.html where other modules are imported
+// Find the line that says: "import { TurtleDrawer } from './turtleDrawer.mjs';"
+// And add this right after it:
+import { ParameterManager } from './2DParameters.mjs';
+
+// Add this to the HTML where the other buttons are defined in the footer div
+// Find the line with: <button class="button" id="export-svg">Export SVG</button>
+// And add this right after it:
+const paramsButton = document.createElement('button');
+paramsButton.className = 'button';
+paramsButton.id = 'params-button';
+paramsButton.textContent = 'Parameters';
+document.querySelector('.footer').appendChild(paramsButton);
+
+// Add this to the event listeners section where other buttons are initialized
+// Find the section that starts with: "// Event listeners"
+// And add this after the other button event listeners:
+let parameterManager = null;
+paramsButton.addEventListener('click', () => {
+  if (!parameterManager && interpreter) {
+    parameterManager = new ParameterManager(canvas, interpreter, editor, runCode);
+    // Make the AST available to the parameter manager
+    parameterManager.setAST(astOutput.textContent ? JSON.parse(astOutput.textContent) : null);
+  } else if (parameterManager) {
+    parameterManager.toggleMenu();
+    parameterManager.refreshShapeList();
+    // Update AST reference
+    parameterManager.setAST(astOutput.textContent ? JSON.parse(astOutput.textContent) : null);
+  }
+});
+
+// Modify the runCode function to update the parameter manager when code runs
+// Find the part where it says "displayErrors([]);" towards the end
+// And add this right after:
+if (parameterManager) {
+  parameterManager.setAST(ast);
+  parameterManager.refreshShapeList();
+}
 
     // Initialize CodeMirror for 2D editor
     CodeMirror.defineSimpleMode("aqui", {
@@ -1284,6 +1326,8 @@ This documentation provides an in-depth guide on using Aqui for shape creation a
 
     // Initial run
     runCode();
+
+    
   </script>
 </body>
 </html>
