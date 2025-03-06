@@ -530,29 +530,22 @@
       });
     });
 
-    // Import required modules
     const { Lexer } = await import('./lexer.mjs');
     const { Parser } = await import('./parser.mjs');
     const { Interpreter } = await import('./interpreter.mjs');
     const { Renderer } = await import('./renderer.mjs');
     const { TurtleDrawer } = await import('./turtleDrawer.mjs');
-    // Add this to the import section of your index.html where other modules are imported
-// Find the line that says: "import { TurtleDrawer } from './turtleDrawer.mjs';"
-// And add this right after it:
+
 import { ParameterManager } from './2DParameters.mjs';
 
-// Add this to the HTML where the other buttons are defined in the footer div
-// Find the line with: <button class="button" id="export-svg">Export SVG</button>
-// And add this right after it:
+
+
 const paramsButton = document.createElement('button');
 paramsButton.className = 'button';
 paramsButton.id = 'params-button';
 paramsButton.textContent = 'Parameters';
 document.querySelector('.footer').appendChild(paramsButton);
 
-// Add this to the event listeners section where other buttons are initialized
-// Find the section that starts with: "// Event listeners"
-// And add this after the other button event listeners:
 let parameterManager = null;
 paramsButton.addEventListener('click', () => {
   if (!parameterManager && interpreter) {
@@ -567,9 +560,7 @@ paramsButton.addEventListener('click', () => {
   }
 });
 
-// Modify the runCode function to update the parameter manager when code runs
-// Find the part where it says "displayErrors([]);" towards the end
-// And add this right after:
+
 if (parameterManager) {
   parameterManager.setAST(ast);
   parameterManager.refreshShapeList();
@@ -621,48 +612,73 @@ if (parameterManager) {
       viewErrorsButton.classList.toggle('error', errorArray.length > 0);
     }
 
+    
     function runCode() {
-      try {
-        renderer.clear();
-        const code = editor.getValue();
-        const lexer = new Lexer(code);
-        const parser = new Parser(lexer);
-        const ast = parser.parse();
-        astOutput.textContent = JSON.stringify(ast, null, 2);
+  try {
+    renderer.clear();
+    const code = editor.getValue();
+    const lexer = new Lexer(code);
+    const parser = new Parser(lexer);
+    const ast = parser.parse();
+    astOutput.textContent = JSON.stringify(ast, null, 2);
 
-        interpreter = new Interpreter();
-        const result = interpreter.interpret(ast);
+    interpreter = new Interpreter();
+    const result = interpreter.interpret(ast);
 
-        // Draw shapes
-        result.shapes.forEach(shape => {
-          renderer.drawShape(shape);
-        });
+    // Draw shapes
+    result.shapes.forEach(shape => {
+      renderer.drawShape(shape);
+    });
 
-        // Draw layers with transformations
-        result.layers.forEach(layer => {
-          const { transform } = layer;
-          layer.shapes.forEach(shape => {
-            const combinedShape = {
-              ...shape,
-              transform: {
-                position: shape.transform.position,
-                rotation: (shape.transform.rotation || 0) + (transform.rotation || 0),
-                scale: [
-                  shape.transform.scale[0] * transform.scale[0],
-                  shape.transform.scale[1] * transform.scale[1]
-                ]
-              }
-            };
-            renderer.drawShape(combinedShape);
-          });
-        });
-        
-        displayErrors([]);
-      } catch (error) {
-        console.error(error);
-        displayErrors(error);
-      }
+    // Draw layers with transformations
+    result.layers.forEach(layer => {
+      const { transform } = layer;
+      layer.shapes.forEach(shape => {
+        const combinedShape = {
+          ...shape,
+          transform: {
+            position: shape.transform.position,
+            rotation: (shape.transform.rotation || 0) + (transform.rotation || 0),
+            scale: [
+              shape.transform.scale[0] * transform.scale[0],
+              shape.transform.scale[1] * transform.scale[1]
+            ]
+          }
+        };
+        renderer.drawShape(combinedShape);
+      });
+    });
+
+    // Add this code to update parameter manager with new AST
+    if (parameterManager) {
+      parameterManager.setAST(ast);
+      parameterManager.refreshShapeList();
     }
+    
+    displayErrors([]);
+
+  } catch (error) {
+    console.error(error);
+    displayErrors(error);
+  }
+}
+
+// Fix the parameters button event listener
+paramsButton.addEventListener('click', () => {
+  if (!parameterManager && interpreter) {
+    parameterManager = new ParameterManager(canvas, interpreter, editor, runCode);
+    // Use the current AST from the astOutput element
+    const currentAst = astOutput.textContent ? JSON.parse(astOutput.textContent) : null;
+    parameterManager.setAST(currentAst);
+  } else if (parameterManager) {
+    parameterManager.toggleMenu();
+    // Always refresh with latest AST
+    const currentAst = astOutput.textContent ? JSON.parse(astOutput.textContent) : null;
+    parameterManager.setAST(currentAst);
+    parameterManager.refreshShapeList();
+  }
+});
+
 
     // Global reference to the 3D editor
     let editor3D = null;
