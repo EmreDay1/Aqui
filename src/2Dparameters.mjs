@@ -15,6 +15,32 @@ export class ParameterManager {
     
     setAST(ast) {
       this.ast = ast;
+      
+      // If the menu is visible and we're getting a new AST, refresh shapes list
+      if (this.menuVisible && this.ast) {
+        this.refreshShapeList();
+        
+        // If we have a currently selected shape, refresh its parameters
+        if (this.currentShape) {
+          // Find the shape in the AST
+          const shapeNode = this.findShapeInAST(this.currentShape);
+          if (shapeNode) {
+            this.populateParametersFromAST(shapeNode);
+          } else {
+            // Fall back to interpreter if shape not found in AST
+            this.populateParameters(this.currentShape);
+          }
+        }
+      }
+    }
+    
+    findShapeInAST(shapeName) {
+      if (!this.ast || !Array.isArray(this.ast)) {
+        return null;
+      }
+      
+      // Find shape by name in the AST
+      return this.ast.find(node => node.type === 'shape' && node.name === shapeName);
     }
   
     setupUI() {
@@ -123,9 +149,10 @@ export class ParameterManager {
     toggleMenu() {
       this.menuVisible = !this.menuVisible;
       
-      // Toggle the visibility of the entire container instead of just the menu content
+      // Toggle the visibility of the entire container
       this.container.style.display = this.menuVisible ? 'block' : 'none';
       
+      // If opening the menu, refresh content with latest AST
       if (this.menuVisible) {
         this.refreshShapeList();
       }
