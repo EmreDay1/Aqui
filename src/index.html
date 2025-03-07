@@ -481,7 +481,6 @@
 
     const canvas = document.getElementById('canvas');
     const canvas3D = document.getElementById('canvas-3d');
-    const runButton = document.getElementById('run-button');
     const viewAstButton = document.getElementById('view-ast');
     const viewErrorsButton = document.getElementById('view-errors');
     const exportSvgButton = document.getElementById('export-svg');
@@ -538,7 +537,7 @@
 
 import { ParameterManager } from './2DParameters.mjs';
 
-
+// Replace the current parameterManager initialization with this code
 
 const paramsButton = document.createElement('button');
 paramsButton.className = 'button';
@@ -547,23 +546,171 @@ paramsButton.textContent = 'Parameters';
 document.querySelector('.footer').appendChild(paramsButton);
 
 let parameterManager = null;
+
+// Modified ParameterManager class with update button
+class ExtendedParameterManager extends ParameterManager {
+  constructor(canvas, interpreter, editor, runCode) {
+    super(canvas, interpreter, editor, runCode);
+    this.addUpdateButton();
+  }
+  
+  addUpdateButton() {
+    // Create update button
+    const updateButton = document.createElement('button');
+    updateButton.className = 'update-button';
+    updateButton.textContent = 'Update';
+    
+    // Enhanced styling for the update button
+    updateButton.style.position = 'absolute';
+    updateButton.style.bottom = '15px';
+    updateButton.style.left = '15px';
+    updateButton.style.padding = '8px 12px';
+    updateButton.style.fontSize = '13px';
+    updateButton.style.fontFamily = 'monospace';
+    updateButton.style.backgroundColor = '#1289d8';
+    updateButton.style.color = 'white';
+    updateButton.style.border = 'none';
+    updateButton.style.borderRadius = '4px';
+    updateButton.style.cursor = 'pointer';
+    updateButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+    updateButton.style.transition = 'all 0.2s ease-in-out';
+    
+    // Add hover effect
+    updateButton.addEventListener('mouseover', () => {
+      updateButton.style.backgroundColor = '#0d6efd';
+      updateButton.style.boxShadow = '0 3px 6px rgba(0,0,0,0.25)';
+      updateButton.style.transform = 'translateY(-1px)';
+    });
+    updateButton.addEventListener('mouseout', () => {
+      updateButton.style.backgroundColor = '#1289d8';
+      updateButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+      updateButton.style.transform = 'translateY(0)';
+    });
+    
+    // Add active effect (when clicked)
+    updateButton.addEventListener('mousedown', () => {
+      updateButton.style.backgroundColor = '#0a58ca';
+      updateButton.style.boxShadow = '0 1px 2px rgba(0,0,0,0.2)';
+      updateButton.style.transform = 'translateY(1px)';
+    });
+    updateButton.addEventListener('mouseup', () => {
+      updateButton.style.backgroundColor = '#0d6efd';
+      updateButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+      updateButton.style.transform = 'translateY(0)';
+    });
+    
+    // Add click handler to update shapes
+    updateButton.addEventListener('click', () => {
+      this.updateWithLatestInterpreter();
+    });
+    
+    // Add to container
+    this.container.appendChild(updateButton);
+    
+    // Improve the container styling to accommodate the button
+    this.container.style.paddingBottom = '50px';
+  }
+  
+  // Method to update directly from the current interpreter
+  updateWithLatestInterpreter() {
+    try {
+      const updateButton = this.container.querySelector('.update-button');
+      
+      // Access the current interpreter from the global scope
+      if (typeof interpreter !== 'undefined' && interpreter) {
+        // Remember the current selection
+        const currentSelectedShape = this.currentShape;
+        
+        // Update the reference to the interpreter
+        this.interpreter = interpreter;
+        
+        // Refresh the shapes list with the current interpreter's shapes
+        this.refreshShapeList();
+        
+        // Try to restore the previous selection if it still exists
+        if (currentSelectedShape && this.shapeSelector) {
+          // Find the option with the matching value
+          for (let i = 0; i < this.shapeSelector.options.length; i++) {
+            if (this.shapeSelector.options[i].value === currentSelectedShape) {
+              this.shapeSelector.selectedIndex = i;
+              this.onShapeSelected(); // Reload parameters for this shape
+              break;
+            }
+          }
+        }
+        
+        // Add visual feedback with improved styling for success
+        if (updateButton) {
+          const originalText = updateButton.textContent;
+          updateButton.textContent = '✓ Updated!';
+          updateButton.style.backgroundColor = '#28a745';
+          
+          setTimeout(() => {
+            updateButton.textContent = originalText;
+            updateButton.style.backgroundColor = '#1289d8';
+          }, 1200);
+        }
+      } else {
+        throw new Error("Interpreter not available");
+      }
+    } catch (e) {
+      console.error("Error updating shapes:", e);
+      const updateButton = this.container.querySelector('.update-button');
+      
+      // Provide visual feedback for error
+      if (updateButton) {
+        const originalText = updateButton.textContent;
+        updateButton.textContent = '✗ Error!';
+        updateButton.style.backgroundColor = '#dc3545';
+        
+        setTimeout(() => {
+          updateButton.textContent = originalText;
+          updateButton.style.backgroundColor = '#1289d8';
+        }, 1200);
+      }
+    }
+  }
+}
+
+// Create parameter manager when button is clicked
 paramsButton.addEventListener('click', () => {
   if (!parameterManager && interpreter) {
-    parameterManager = new ParameterManager(canvas, interpreter, editor, runCode);
-    // Make the AST available to the parameter manager
-    parameterManager.setAST(astOutput.textContent ? JSON.parse(astOutput.textContent) : null);
+    // Use extended parameter manager with update button
+    parameterManager = new ExtendedParameterManager(canvas, interpreter, editor, runCode);
   } else if (parameterManager) {
+    // If the interpreter has changed, update the reference
+    if (parameterManager.interpreter !== interpreter) {
+      parameterManager.interpreter = interpreter;
+    }
+    
     parameterManager.toggleMenu();
     parameterManager.refreshShapeList();
-    // Update AST reference
-    parameterManager.setAST(astOutput.textContent ? JSON.parse(astOutput.textContent) : null);
   }
 });
 
-
-if (parameterManager) {
-  parameterManager.setAST(ast);
-  parameterManager.refreshShapeList();
+// Add a listener to the run button to update the parameter manager
+const runButton = document.getElementById('run-button');
+if (runButton) {
+  // Store the original onclick handler if it exists
+  const originalOnClick = runButton.onclick;
+  
+  runButton.onclick = function(event) {
+    // Call the original handler if it exists
+    if (originalOnClick) {
+      originalOnClick.call(this, event);
+    } else {
+      // If no handler, just run the code (this should rarely happen)
+      runCode();
+    }
+    
+    // After a small delay to ensure the interpreter is updated
+    setTimeout(() => {
+      // If parameter manager exists and the menu is visible, update the shapes
+      if (parameterManager && parameterManager.menuVisible) {
+        parameterManager.updateWithLatestInterpreter();
+      }
+    }, 100);
+  };
 }
 
     // Initialize CodeMirror for 2D editor
@@ -612,73 +759,52 @@ if (parameterManager) {
       viewErrorsButton.classList.toggle('error', errorArray.length > 0);
     }
 
-    
     function runCode() {
-  try {
-    renderer.clear();
-    const code = editor.getValue();
-    const lexer = new Lexer(code);
-    const parser = new Parser(lexer);
-    const ast = parser.parse();
-    astOutput.textContent = JSON.stringify(ast, null, 2);
+      try {
+        renderer.clear();
+        const code = editor.getValue();
+        const lexer = new Lexer(code);
+        const parser = new Parser(lexer);
+        const ast = parser.parse();
+        astOutput.textContent = JSON.stringify(ast, null, 2);
 
-    interpreter = new Interpreter();
-    const result = interpreter.interpret(ast);
+        interpreter = new Interpreter();
+        const result = interpreter.interpret(ast);
 
-    // Draw shapes
-    result.shapes.forEach(shape => {
-      renderer.drawShape(shape);
-    });
+        // Draw shapes
+        result.shapes.forEach(shape => {
+          renderer.drawShape(shape);
+        });
 
-    // Draw layers with transformations
-    result.layers.forEach(layer => {
-      const { transform } = layer;
-      layer.shapes.forEach(shape => {
-        const combinedShape = {
-          ...shape,
-          transform: {
-            position: shape.transform.position,
-            rotation: (shape.transform.rotation || 0) + (transform.rotation || 0),
-            scale: [
-              shape.transform.scale[0] * transform.scale[0],
-              shape.transform.scale[1] * transform.scale[1]
-            ]
-          }
-        };
-        renderer.drawShape(combinedShape);
-      });
-    });
+        // Draw layers with transformations
+        result.layers.forEach(layer => {
+          const { transform } = layer;
+          layer.shapes.forEach(shape => {
+            const combinedShape = {
+              ...shape,
+              transform: {
+                position: shape.transform.position,
+                rotation: (shape.transform.rotation || 0) + (transform.rotation || 0),
+                scale: [
+                  shape.transform.scale[0] * transform.scale[0],
+                  shape.transform.scale[1] * transform.scale[1]
+                ]
+              }
+            };
+            renderer.drawShape(combinedShape);
+          });
+          
+        });
 
-    // Add this code to update parameter manager with new AST
-    if (parameterManager) {
-      parameterManager.setAST(ast);
-      parameterManager.refreshShapeList();
+        
+        
+        displayErrors([]);
+
+      } catch (error) {
+        console.error(error);
+        displayErrors(error);
+      }
     }
-    
-    displayErrors([]);
-
-  } catch (error) {
-    console.error(error);
-    displayErrors(error);
-  }
-}
-
-// Fix the parameters button event listener
-paramsButton.addEventListener('click', () => {
-  if (!parameterManager && interpreter) {
-    parameterManager = new ParameterManager(canvas, interpreter, editor, runCode);
-    // Use the current AST from the astOutput element
-    const currentAst = astOutput.textContent ? JSON.parse(astOutput.textContent) : null;
-    parameterManager.setAST(currentAst);
-  } else if (parameterManager) {
-    parameterManager.toggleMenu();
-    // Always refresh with latest AST
-    const currentAst = astOutput.textContent ? JSON.parse(astOutput.textContent) : null;
-    parameterManager.setAST(currentAst);
-    parameterManager.refreshShapeList();
-  }
-});
-
 
     // Global reference to the 3D editor
     let editor3D = null;
